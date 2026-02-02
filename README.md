@@ -132,15 +132,6 @@ Try a smaller model:
 ollama pull phi3
 ```
 
-## 🚀 Future Enhancements
-
-- [ ] Add FastAPI REST endpoint
-- [ ] Build Streamlit web interface
-- [ ] Support PDF document loading
-- [ ] Add conversation history
-- [ ] Multi-document comparison
-- [ ] Export chat history
-
 ## 📝 License
 
 MIT License - Feel free to use this for your projects!
@@ -149,9 +140,7 @@ MIT License - Feel free to use this for your projects!
 
 **Fatima**
 - Backend Developer | AI Enthusiast
-- LinkedIn: [Your LinkedIn]
-- Medium: [@foretold-fatima](https://medium.com/@foretold-fatima)
-- YouTube: [Foretold Fatima](https://www.youtube.com/@foretoldfatima)
+- LinkedIn: [linkedin.com/in/frostami](https://www.linkedin.com/in/frostami/)
 
 ## 🙏 Acknowledgments
 
