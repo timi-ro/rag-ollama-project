@@ -10,12 +10,15 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 🔒 **Secure** - Your data never leaves your machine
 - 📚 **Smart Document Search** - Semantic retrieval with vector embeddings
 - 💬 **Interactive Chat** - Ask questions about your documents
+- 📄 **Multi-Format Support** - Load PDFs, Word docs, HTML, CSV, Markdown, and text files
 
 ## 🛠️ Tech Stack
 
 - **LangChain** - RAG framework
 - **Ollama** - Local LLM (Llama 3.2)
 - **ChromaDB** - Vector database
+- **PyPDF** - PDF processing
+- **Unstructured** - HTML parsing
 - **Python 3.8+**
 
 ## 🚀 Quick Start
@@ -59,19 +62,18 @@ Example questions:
 - "How does retrieval work?"
 - "What are the main components?"
 
-### Customize with Your Own Documents
+### Add Your Own Documents
 
-Replace the WebBaseLoader in `main.py` with your own data:
-```python
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
+Simply drop files into the `./docs` folder and run `python main.py`. The system automatically detects and loads all supported file types:
 
-loader = DirectoryLoader(
-    './docs',  # Your documents folder
-    glob="**/*.md",
-    loader_cls=TextLoader
-)
-docs = loader.load()
-```
+| Format | Extensions | Use Case |
+|--------|------------|----------|
+| Markdown | `.md` | Documentation, notes |
+| Text | `.txt` | Plain text files |
+| PDF | `.pdf` | Reports, papers, manuals |
+| Word | `.docx` | Documents |
+| HTML | `.html`, `.htm` | Web pages |
+| CSV | `.csv` | Spreadsheet data |
 
 ## 📁 Project Structure
 ```
@@ -80,6 +82,7 @@ rag-ollama-project/
 ├── requirements.txt     # Python dependencies
 ├── README.md           # This file
 ├── .gitignore          # Git ignore rules
+├── docs/               # Your documents go here
 ├── chroma_db/          # Vector database (auto-generated)
 └── venv/               # Virtual environment (auto-generated)
 ```

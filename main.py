@@ -1,23 +1,62 @@
+from pathlib import Path
 from langchain_community.llms import Ollama
 from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
-
-print("🚀 Starting RAG system...")
-
-print("📚 Loading documents...")
-loader = DirectoryLoader(
-    './docs',
-    glob="**/*.md",
-    loader_cls=TextLoader
+from langchain_community.document_loaders import (
+    TextLoader,
+    PyPDFLoader,
+    Docx2txtLoader,
+    UnstructuredHTMLLoader,
+    CSVLoader,
 )
-docs = loader.load()
-print(f"✅ Loaded {len(docs)} documents")
+
+# File type to loader mapping
+LOADER_MAPPING = {
+    ".txt": TextLoader,
+    ".md": TextLoader,
+    ".pdf": PyPDFLoader,
+    ".docx": Docx2txtLoader,
+    ".html": UnstructuredHTMLLoader,
+    ".htm": UnstructuredHTMLLoader,
+    ".csv": CSVLoader,
+}
+
+
+def load_documents(docs_dir: str = "./docs") -> list:
+    """Load documents from a directory, supporting multiple file types."""
+    documents = []
+    docs_path = Path(docs_dir)
+
+    if not docs_path.exists():
+        print(f"Warning: Directory {docs_dir} does not exist")
+        return documents
+
+    supported_extensions = set(LOADER_MAPPING.keys())
+
+    for file_path in docs_path.rglob("*"):
+        if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+            ext = file_path.suffix.lower()
+            loader_cls = LOADER_MAPPING[ext]
+            try:
+                loader = loader_cls(str(file_path))
+                file_docs = loader.load()
+                documents.extend(file_docs)
+                print(f"  Loaded: {file_path.name} ({len(file_docs)} section(s))")
+            except Exception as e:
+                print(f"  Error loading {file_path.name}: {e}")
+
+    return documents
+
+
+print("Starting RAG system...")
+
+print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
+docs = load_documents("./docs")
+print(f"Loaded {len(docs)} document sections total")
 
 # 2. Split documents
 print("✂️  Splitting documents...")
