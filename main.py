@@ -3,9 +3,10 @@ from langchain_community.llms import Ollama
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain.chains import create_retrieval_chain
+from langchain.chains import create_retrieval_chain, create_history_aware_retriever
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_community.document_loaders import (
     TextLoader,
     PyPDFLoader,
@@ -84,7 +85,21 @@ retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 print("🤖 Setting up LLM...")
 llm = Ollama(model="llama3.2", temperature=0)
 
-# 6. Create prompt
+# 6. Create history-aware retriever
+contextualize_prompt = ChatPromptTemplate.from_messages([
+    ("system",
+     "Given a chat history and the latest user question, "
+     "reformulate the question so it can be understood without "
+     "the chat history. Do NOT answer the question, just "
+     "reformulate it if needed, otherwise return it as is."),
+    MessagesPlaceholder("chat_history"),
+    ("human", "{input}"),
+])
+history_aware_retriever = create_history_aware_retriever(
+    llm, retriever, contextualize_prompt
+)
+
+# 7. Create answer prompt with history
 system_prompt = (
     "You are an assistant for question-answering tasks. "
     "Use the following pieces of retrieved context to answer "
@@ -97,16 +112,21 @@ system_prompt = (
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
+    MessagesPlaceholder("chat_history"),
     ("human", "{input}"),
 ])
 
-# 7. Create chain
+# 8. Create chain
 question_answer_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
-# 8. Query function
+# 9. Chat history and query function
+chat_history = []
+
 def query(question: str):
-    response = rag_chain.invoke({"input": question})
+    response = rag_chain.invoke({"input": question, "chat_history": chat_history})
+    chat_history.append(HumanMessage(content=question))
+    chat_history.append(AIMessage(content=response["answer"]))
     return response["answer"]
 
 # Test it
