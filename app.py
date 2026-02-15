@@ -1,0 +1,36 @@
+import streamlit as st
+from main import initialize, query
+
+st.title("RAG Chat")
+st.caption("Ask questions about your documents")
+
+
+@st.cache_resource
+def get_chain():
+    return initialize()
+
+
+rag_chain = get_chain()
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display previous messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Chat input
+if prompt := st.chat_input("Ask a question about your documents"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            answer = query(prompt, rag_chain, st.session_state.chat_history)
+        st.markdown(answer)
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})

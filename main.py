@@ -53,89 +53,89 @@ def load_documents(docs_dir: str = "./docs") -> list:
     return documents
 
 
-print("Starting RAG system...")
+def initialize():
+    """Initialize the RAG chain. Returns the chain object."""
+    print("Starting RAG system...")
 
-print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
-docs = load_documents("./docs")
-print(f"Loaded {len(docs)} document sections total")
+    print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
+    docs = load_documents("./docs")
+    print(f"Loaded {len(docs)} document sections total")
 
-# 2. Split documents
-print("✂️  Splitting documents...")
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200
-)
-splits = text_splitter.split_documents(docs)
-print(f"✅ Created {len(splits)} chunks")
+    print("✂️  Splitting documents...")
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    splits = text_splitter.split_documents(docs)
+    print(f"✅ Created {len(splits)} chunks")
 
-# 3. Create embeddings with Ollama (FREE!)
-print("🧠 Creating embeddings (this may take a minute)...")
-embeddings = OllamaEmbeddings(model="llama3.2")
-vectorstore = Chroma.from_documents(
-    documents=splits,
-    embedding=embeddings,
-    persist_directory="./chroma_db"
-)
-print("✅ Vector store created")
+    print("🧠 Creating embeddings (this may take a minute)...")
+    embeddings = OllamaEmbeddings(model="llama3.2")
+    vectorstore = Chroma.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        persist_directory="./chroma_db"
+    )
+    print("✅ Vector store created")
 
-# 4. Create retriever
-retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-# 5. Set up LLM with Ollama
-print("🤖 Setting up LLM...")
-llm = Ollama(model="llama3.2", temperature=0)
+    print("🤖 Setting up LLM...")
+    llm = Ollama(model="llama3.2", temperature=0)
 
-# 6. Create history-aware retriever
-contextualize_prompt = ChatPromptTemplate.from_messages([
-    ("system",
-     "Given a chat history and the latest user question, "
-     "reformulate the question so it can be understood without "
-     "the chat history. Do NOT answer the question, just "
-     "reformulate it if needed, otherwise return it as is."),
-    MessagesPlaceholder("chat_history"),
-    ("human", "{input}"),
-])
-history_aware_retriever = create_history_aware_retriever(
-    llm, retriever, contextualize_prompt
-)
+    contextualize_prompt = ChatPromptTemplate.from_messages([
+        ("system",
+         "Given a chat history and the latest user question, "
+         "reformulate the question so it can be understood without "
+         "the chat history. Do NOT answer the question, just "
+         "reformulate it if needed, otherwise return it as is."),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ])
+    history_aware_retriever = create_history_aware_retriever(
+        llm, retriever, contextualize_prompt
+    )
 
-# 7. Create answer prompt with history
-system_prompt = (
-    "You are an assistant for question-answering tasks. "
-    "Use the following pieces of retrieved context to answer "
-    "the question. If you don't know the answer, say that you "
-    "don't know. Use three sentences maximum and keep the "
-    "answer concise."
-    "\n\n"
-    "{context}"
-)
+    system_prompt = (
+        "You are an assistant for question-answering tasks. "
+        "Use the following pieces of retrieved context to answer "
+        "the question. If you don't know the answer, say that you "
+        "don't know. Use three sentences maximum and keep the "
+        "answer concise."
+        "\n\n"
+        "{context}"
+    )
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    MessagesPlaceholder("chat_history"),
-    ("human", "{input}"),
-])
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ])
 
-# 8. Create chain
-question_answer_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+    print("✅ RAG chain ready")
 
-# 9. Chat history and query function
-chat_history = []
+    return rag_chain
 
-def query(question: str):
+
+def query(question: str, rag_chain, chat_history: list):
+    """Query the RAG chain with conversation history."""
     response = rag_chain.invoke({"input": question, "chat_history": chat_history})
     chat_history.append(HumanMessage(content=question))
     chat_history.append(AIMessage(content=response["answer"]))
     return response["answer"]
 
-# Test it
+
 if __name__ == "__main__":
+    rag_chain = initialize()
+    chat_history = []
+
     print("\n" + "="*50)
     question = "What is TypeScript?"
     print(f"❓ Question: {question}")
     print("🤔 Thinking...")
-    answer = query(question)
+    answer = query(question, rag_chain, chat_history)
     print(f"💡 Answer: {answer}")
     print("="*50 + "\n")
 
@@ -147,5 +147,5 @@ if __name__ == "__main__":
             print("👋 Goodbye!")
             break
         print("🤔 Thinking...")
-        answer = query(user_question)
+        answer = query(user_question, rag_chain, chat_history)
         print(f"💡 Answer: {answer}")

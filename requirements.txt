@@ -5,3 +5,4 @@ chromadb==1.4.1
 pypdf==5.1.0
 docx2txt==0.8
 unstructured==0.16.11
+streamlit==1.41.1
