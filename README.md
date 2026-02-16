@@ -10,6 +10,8 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 🔒 **Secure** - Your data never leaves your machine
 - 📚 **Smart Document Search** - Semantic retrieval with vector embeddings
 - 💬 **Interactive Chat** - Ask questions about your documents
+- 🧠 **Conversation History** - Follow-up questions with context awareness
+- 🌐 **Web Interface** - Streamlit-powered chat UI
 - 📄 **Multi-Format Support** - Load PDFs, Word docs, HTML, CSV, Markdown, and text files
 
 ## 🛠️ Tech Stack
@@ -19,6 +21,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - **ChromaDB** - Vector database
 - **PyPDF** - PDF processing
 - **Unstructured** - HTML parsing
+- **Streamlit** - Web chat interface
 - **Python 3.8+**
 
 ## 🚀 Quick Start
@@ -50,9 +53,16 @@ python main.py
 
 ## 💡 Usage
 
-### Interactive Mode
+### Web Interface
 
-Simply run the script and ask questions:
+Launch the Streamlit chat UI:
+```bash
+streamlit run app.py
+```
+
+### CLI Mode
+
+Or use the command-line interface:
 ```bash
 python main.py
 ```
@@ -79,6 +89,7 @@ Simply drop files into the `./docs` folder and run `python main.py`. The system 
 ```
 rag-ollama-project/
 ├── main.py              # Core RAG implementation
+├── app.py               # Streamlit web interface
 ├── requirements.txt     # Python dependencies
 ├── README.md           # This file
 ├── .gitignore          # Git ignore rules
