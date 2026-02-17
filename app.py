@@ -17,6 +17,12 @@ if "chat_history" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if st.session_state.messages:
+    if st.button("Clear chat"):
+        st.session_state.chat_history = []
+        st.session_state.messages = []
+        st.rerun()
+
 # Display previous messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
