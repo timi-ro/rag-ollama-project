@@ -27,6 +27,8 @@ if st.session_state.messages:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+        if message.get("sources"):
+            st.caption(f"Sources: {', '.join(message['sources'])}")
 
 # Chat input
 if prompt := st.chat_input("Ask a question about your documents"):
@@ -36,7 +38,9 @@ if prompt := st.chat_input("Ask a question about your documents"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            answer = query(prompt, rag_chain, st.session_state.chat_history)
+            answer, sources = query(prompt, rag_chain, st.session_state.chat_history)
         st.markdown(answer)
+        if sources:
+            st.caption(f"Sources: {', '.join(sources)}")
 
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})

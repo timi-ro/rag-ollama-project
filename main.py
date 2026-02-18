@@ -120,11 +120,18 @@ def initialize():
 
 
 def query(question: str, rag_chain, chat_history: list):
-    """Query the RAG chain with conversation history."""
+    """Query the RAG chain with conversation history. Returns (answer, sources)."""
     response = rag_chain.invoke({"input": question, "chat_history": chat_history})
     chat_history.append(HumanMessage(content=question))
     chat_history.append(AIMessage(content=response["answer"]))
-    return response["answer"]
+
+    sources = []
+    for doc in response.get("context", []):
+        source = Path(doc.metadata.get("source", "unknown")).name
+        if source not in sources:
+            sources.append(source)
+
+    return response["answer"], sources
 
 
 if __name__ == "__main__":
@@ -135,8 +142,9 @@ if __name__ == "__main__":
     question = "What is TypeScript?"
     print(f"❓ Question: {question}")
     print("🤔 Thinking...")
-    answer = query(question, rag_chain, chat_history)
+    answer, sources = query(question, rag_chain, chat_history)
     print(f"💡 Answer: {answer}")
+    print(f"📎 Sources: {', '.join(sources)}")
     print("="*50 + "\n")
 
     # Interactive mode
@@ -147,5 +155,6 @@ if __name__ == "__main__":
             print("👋 Goodbye!")
             break
         print("🤔 Thinking...")
-        answer = query(user_question, rag_chain, chat_history)
+        answer, sources = query(user_question, rag_chain, chat_history)
         print(f"💡 Answer: {answer}")
+        print(f"📎 Sources: {', '.join(sources)}")
