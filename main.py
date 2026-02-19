@@ -134,6 +134,30 @@ def query(question: str, rag_chain, chat_history: list):
     return response["answer"], sources
 
 
+def query_stream(question: str, rag_chain, chat_history: list):
+    """Stream the RAG response token by token.
+
+    Yields (token, sources) tuples. For all intermediate chunks, sources is None.
+    The final yielded tuple is ("", sources_list) and also updates chat_history.
+    """
+    sources = []
+    full_answer = ""
+
+    for chunk in rag_chain.stream({"input": question, "chat_history": chat_history}):
+        if "context" in chunk:
+            for doc in chunk["context"]:
+                source = Path(doc.metadata.get("source", "unknown")).name
+                if source not in sources:
+                    sources.append(source)
+        if "answer" in chunk:
+            full_answer += chunk["answer"]
+            yield chunk["answer"], None
+
+    chat_history.append(HumanMessage(content=question))
+    chat_history.append(AIMessage(content=full_answer))
+    yield "", sources
+
+
 if __name__ == "__main__":
     rag_chain = initialize()
     chat_history = []

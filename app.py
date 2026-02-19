@@ -1,5 +1,5 @@
 import streamlit as st
-from main import initialize, query
+from main import initialize, query_stream
 
 st.title("RAG Chat")
 st.caption("Ask questions about your documents")
@@ -37,10 +37,17 @@ if prompt := st.chat_input("Ask a question about your documents"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer, sources = query(prompt, rag_chain, st.session_state.chat_history)
-        st.markdown(answer)
+        placeholder = st.empty()
+        full_response = ""
+        sources = []
+        for token, final_sources in query_stream(prompt, rag_chain, st.session_state.chat_history):
+            if final_sources is not None:
+                sources = final_sources
+            else:
+                full_response += token
+                placeholder.markdown(full_response + "▌")
+        placeholder.markdown(full_response)
         if sources:
             st.caption(f"Sources: {', '.join(sources)}")
 
-    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
+    st.session_state.messages.append({"role": "assistant", "content": full_response, "sources": sources})
