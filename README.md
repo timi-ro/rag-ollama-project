@@ -6,13 +6,15 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 
 - 🆓 **100% Free** - No API keys, no payment methods
 - 🏠 **Runs Locally** - Complete privacy, works offline
-- ⚡ **Fast** - Uses Ollama's optimized local models
+- ⚡  **Fast** - Uses Ollama's optimized local models
 - 🔒 **Secure** - Your data never leaves your machine
 - 📚 **Smart Document Search** - Semantic retrieval with vector embeddings
 - 💬 **Interactive Chat** - Ask questions about your documents
 - 🧠 **Conversation History** - Follow-up questions with context awareness
 - 🌐 **Web Interface** - Streamlit-powered chat UI
 - 📄 **Multi-Format Support** - Load PDFs, Word docs, HTML, CSV, Markdown, and text files
+- ⚡  **Streaming Responses** - Answers stream token by token in real time
+- 📎 **Source Citations** - Every answer shows which documents it came from
 
 ## 🛠️ Tech Stack
 
@@ -100,12 +102,13 @@ rag-ollama-project/
 
 ## 🎯 How It Works
 
-1. **Document Loading** - Loads content from web or local files
+1. **Document Loading** - Loads content from local files in the `./docs` folder
 2. **Text Splitting** - Breaks documents into manageable chunks
 3. **Embedding Creation** - Converts text to vector embeddings using Ollama
 4. **Vector Storage** - Stores embeddings in ChromaDB for fast retrieval
 5. **Semantic Search** - Finds relevant chunks based on your question
-6. **Answer Generation** - Uses Llama 3.2 to generate contextual answers
+6. **Streaming Answer** - Streams the response token by token using Llama 3.2
+7. **Source Citations** - Reports which documents contributed to the answer
 
 ## 🔧 Configuration
 
