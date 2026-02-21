@@ -27,7 +27,14 @@ if st.session_state.get("current_model") != selected_model:
     st.session_state.chat_history = []
     st.session_state.messages = []
 
-rag_chain = get_chain(selected_model)
+try:
+    rag_chain = get_chain(selected_model)
+except Exception as e:
+    if "not found" in str(e).lower() or "404" in str(e):
+        st.error(f"Model **{selected_model}** is not installed. Run `ollama pull {selected_model}` in your terminal, then reload.")
+    else:
+        st.error(f"Failed to initialize model: {e}")
+    st.stop()
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -70,14 +77,23 @@ if prompt := st.chat_input("Ask a question about your documents"):
         placeholder = st.empty()
         full_response = ""
         sources = []
-        for token, final_sources in query_stream(prompt, rag_chain, st.session_state.chat_history):
-            if final_sources is not None:
-                sources = final_sources
+        try:
+            for token, final_sources in query_stream(prompt, rag_chain, st.session_state.chat_history):
+                if final_sources is not None:
+                    sources = final_sources
+                else:
+                    full_response += token
+                    placeholder.markdown(full_response + "▌")
+            placeholder.markdown(full_response)
+            if sources:
+                st.caption(f"Sources: {', '.join(sources)}")
+        except Exception as e:
+            placeholder.empty()
+            if "not found" in str(e).lower() or "404" in str(e):
+                st.error(f"Model **{selected_model}** is not installed. Run `ollama pull {selected_model}` in your terminal, then reload.")
             else:
-                full_response += token
-                placeholder.markdown(full_response + "▌")
-        placeholder.markdown(full_response)
-        if sources:
-            st.caption(f"Sources: {', '.join(sources)}")
+                st.error(f"Something went wrong: {e}")
+            st.session_state.messages.pop()
+            st.stop()
 
     st.session_state.messages.append({"role": "assistant", "content": full_response, "sources": sources, "feedback": None})
