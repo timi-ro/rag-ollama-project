@@ -24,11 +24,24 @@ if st.session_state.messages:
         st.rerun()
 
 # Display previous messages
-for message in st.session_state.messages:
+for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message.get("sources"):
             st.caption(f"Sources: {', '.join(message['sources'])}")
+        if message["role"] == "assistant":
+            feedback = message.get("feedback")
+            col1, col2, _ = st.columns([1, 1, 10])
+            with col1:
+                if st.button("👍", key=f"up_{i}", disabled=feedback is not None):
+                    st.session_state.messages[i]["feedback"] = "up"
+                    st.rerun()
+            with col2:
+                if st.button("👎", key=f"down_{i}", disabled=feedback is not None):
+                    st.session_state.messages[i]["feedback"] = "down"
+                    st.rerun()
+            if feedback:
+                st.caption("Thanks for the feedback!")
 
 # Chat input
 if prompt := st.chat_input("Ask a question about your documents"):
@@ -50,4 +63,4 @@ if prompt := st.chat_input("Ask a question about your documents"):
         if sources:
             st.caption(f"Sources: {', '.join(sources)}")
 
-    st.session_state.messages.append({"role": "assistant", "content": full_response, "sources": sources})
+    st.session_state.messages.append({"role": "assistant", "content": full_response, "sources": sources, "feedback": None})
