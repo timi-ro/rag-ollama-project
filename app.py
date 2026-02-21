@@ -4,13 +4,30 @@ from main import initialize, query_stream
 st.title("RAG Chat")
 st.caption("Ask questions about your documents")
 
+AVAILABLE_MODELS = ["llama3.2", "mistral", "phi3", "codellama", "gemma2"]
+
+with st.sidebar:
+    st.header("Settings")
+    selected_model = st.selectbox(
+        "Model",
+        AVAILABLE_MODELS,
+        index=0,
+    )
+    st.caption("Switching models rebuilds the vector store.")
+
 
 @st.cache_resource
-def get_chain():
-    return initialize()
+def get_chain(model: str):
+    return initialize(model)
 
 
-rag_chain = get_chain()
+# Clear chat when model changes
+if st.session_state.get("current_model") != selected_model:
+    st.session_state.current_model = selected_model
+    st.session_state.chat_history = []
+    st.session_state.messages = []
+
+rag_chain = get_chain(selected_model)
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []

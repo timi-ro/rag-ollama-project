@@ -53,9 +53,9 @@ def load_documents(docs_dir: str = "./docs") -> list:
     return documents
 
 
-def initialize():
+def initialize(model: str = "llama3.2"):
     """Initialize the RAG chain. Returns the chain object."""
-    print("Starting RAG system...")
+    print(f"Starting RAG system with model: {model}...")
 
     print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
     docs = load_documents("./docs")
@@ -70,18 +70,18 @@ def initialize():
     print(f"✅ Created {len(splits)} chunks")
 
     print("🧠 Creating embeddings (this may take a minute)...")
-    embeddings = OllamaEmbeddings(model="llama3.2")
+    embeddings = OllamaEmbeddings(model=model)
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory="./chroma_db"
+        persist_directory=f"./chroma_db/{model}"
     )
     print("✅ Vector store created")
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
     print("🤖 Setting up LLM...")
-    llm = Ollama(model="llama3.2", temperature=0)
+    llm = Ollama(model=model, temperature=0)
 
     contextualize_prompt = ChatPromptTemplate.from_messages([
         ("system",
