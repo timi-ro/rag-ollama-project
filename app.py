@@ -1,5 +1,26 @@
+import datetime
 import streamlit as st
 from main import initialize, query_stream
+
+
+def build_markdown_export(messages: list, model: str) -> str:
+    lines = [
+        f"# Chat Export",
+        f"**Model:** {model}  ",
+        f"**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+    ]
+    for msg in messages:
+        if msg["role"] == "user":
+            lines += [f"### You", msg["content"], ""]
+        else:
+            lines += [f"### Assistant", msg["content"]]
+            if msg.get("sources"):
+                lines.append(f"*Sources: {', '.join(msg['sources'])}*")
+            if msg.get("feedback"):
+                lines.append(f"*Feedback: {msg['feedback']}*")
+            lines.append("")
+    return "\n".join(lines)
 
 st.title("RAG Chat")
 st.caption("Ask questions about your documents")
@@ -14,6 +35,18 @@ with st.sidebar:
         index=0,
     )
     st.caption("Switching models rebuilds the vector store.")
+
+    st.divider()
+    st.header("Export")
+    if st.session_state.get("messages"):
+        st.download_button(
+            label="Download chat (.md)",
+            data=build_markdown_export(st.session_state.messages, st.session_state.get("current_model", "unknown")),
+            file_name=f"chat_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
+            mime="text/markdown",
+        )
+    else:
+        st.caption("No chat to export yet.")
 
 
 @st.cache_resource
