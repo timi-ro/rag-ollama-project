@@ -6,3 +6,5 @@ pypdf==5.1.0
 docx2txt==0.8
 unstructured==0.16.11
 streamlit==1.41.1
+fastapi==0.115.0
+uvicorn==0.32.0
