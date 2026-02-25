@@ -15,6 +15,11 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 📄 **Multi-Format Support** - Load PDFs, Word docs, HTML, CSV, Markdown, and text files
 - ⚡  **Streaming Responses** - Answers stream token by token in real time
 - 📎 **Source Citations** - Every answer shows which documents it came from
+- 🔌 **REST API** - FastAPI backend for integrating with external apps
+- 🏢 **Multi-Tenant** - Each API client gets isolated documents and vector store
+- 📤 **Document Upload API** - Upload, list, and delete documents per tenant
+- 💬 **Session Management** - Server-side conversation history for API clients
+- 🔑 **API Key Auth** - Secure per-tenant access control
 
 ## 🛠️ Tech Stack
 
@@ -24,6 +29,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - **PyPDF** - PDF processing
 - **Unstructured** - HTML parsing
 - **Streamlit** - Web chat interface
+- **FastAPI** - REST API server
 - **Python 3.8+**
 
 ## 🚀 Quick Start
@@ -90,14 +96,17 @@ Simply drop files into the `./docs` folder and run `python main.py`. The system 
 ## 📁 Project Structure
 ```
 rag-ollama-project/
-├── main.py              # Core RAG implementation
-├── app.py               # Streamlit web interface
-├── requirements.txt     # Python dependencies
-├── README.md           # This file
-├── .gitignore          # Git ignore rules
-├── docs/               # Your documents go here
-├── chroma_db/          # Vector database (auto-generated)
-└── venv/               # Virtual environment (auto-generated)
+├── main.py                  # Core RAG implementation
+├── app.py                   # Streamlit web interface
+├── api.py                   # FastAPI REST server
+├── config.example.json      # Tenant config template
+├── config.json              # Your tenant config (git-ignored)
+├── requirements.txt         # Python dependencies
+├── README.md                # This file
+├── .gitignore               # Git ignore rules
+├── docs/{tenant}/           # Documents per tenant
+├── chroma_db/{tenant}/      # Vector store per tenant (auto-generated)
+└── venv/                    # Virtual environment (auto-generated)
 ```
 
 ## 🎯 How It Works
@@ -114,14 +123,9 @@ rag-ollama-project/
 
 ### Using Different Models
 
-Ollama supports multiple models. To use a different one:
+The model can be selected per tenant in `config.json`, or switched live in the Streamlit sidebar. Pull any model first:
 ```bash
-# Pull a different model
 ollama pull mistral
-
-# Update main.py
-llm = Ollama(model="mistral", temperature=0)
-embeddings = OllamaEmbeddings(model="mistral")
 ```
 
 Available models:
@@ -129,6 +133,43 @@ Available models:
 - `mistral` - Great alternative (4GB)
 - `phi3` - Lightweight and fast (2.3GB)
 - `codellama` - Optimized for code (3.8GB)
+
+### REST API Setup
+
+```bash
+# 1. Copy and fill in the config
+cp config.example.json config.json
+
+# 2. Start the API server
+uvicorn api:app --reload
+```
+
+Tenant config (`config.json`):
+```json
+{
+  "tenants": {
+    "site1": { "api_key": "your-secret-key", "model": "llama3.2" },
+    "site2": { "api_key": "another-key",     "model": "mistral"  }
+  }
+}
+```
+
+API endpoints (all require `X-API-Key` header):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check |
+| `POST` | `/chat` | Stateless chat |
+| `POST` | `/chat/stream` | Streaming chat |
+| `POST` | `/sessions` | Create a session |
+| `DELETE` | `/sessions/{id}` | Delete a session |
+| `POST` | `/sessions/{id}/chat` | Chat via session |
+| `POST` | `/sessions/{id}/chat/stream` | Streaming via session |
+| `POST` | `/documents/upload` | Upload a document |
+| `GET` | `/documents` | List documents |
+| `DELETE` | `/documents/{filename}` | Delete a document |
+
+Interactive API docs available at `http://localhost:8000/docs`.
 
 ## 🐛 Troubleshooting
 

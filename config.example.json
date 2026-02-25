@@ -1,0 +1,12 @@
+{
+  "tenants": {
+    "site1": {
+      "api_key": "replace-with-a-strong-secret-key",
+      "model": "llama3.2"
+    },
+    "site2": {
+      "api_key": "replace-with-another-strong-secret-key",
+      "model": "mistral"
+    }
+  }
+}

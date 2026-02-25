@@ -53,12 +53,15 @@ def load_documents(docs_dir: str = "./docs") -> list:
     return documents
 
 
-def initialize(model: str = "llama3.2"):
+def initialize(model: str = "llama3.2", docs_dir: str = "./docs", persist_dir: str = None):
     """Initialize the RAG chain. Returns the chain object."""
+    if persist_dir is None:
+        persist_dir = f"./chroma_db/{model}"
+
     print(f"Starting RAG system with model: {model}...")
 
     print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
-    docs = load_documents("./docs")
+    docs = load_documents(docs_dir)
     print(f"Loaded {len(docs)} document sections total")
 
     print("✂️  Splitting documents...")
@@ -74,7 +77,7 @@ def initialize(model: str = "llama3.2"):
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory=f"./chroma_db/{model}"
+        persist_directory=persist_dir
     )
     print("✅ Vector store created")
 
