@@ -6,6 +6,12 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   rag-api:
     build: .
@@ -21,7 +27,8 @@ services:
     volumes:
       - rag_data:/app/data
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
 
   streamlit:
     build: .
@@ -34,7 +41,8 @@ services:
     volumes:
       - streamlit_chroma:/app/chroma_db
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
 
 volumes:
   ollama_data:
