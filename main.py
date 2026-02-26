@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from langchain_community.llms import Ollama
 from langchain_community.embeddings import OllamaEmbeddings
@@ -73,7 +74,8 @@ def initialize(model: str = "llama3.2", docs_dir: str = "./docs", persist_dir: s
     print(f"✅ Created {len(splits)} chunks")
 
     print("🧠 Creating embeddings (this may take a minute)...")
-    embeddings = OllamaEmbeddings(model=model)
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    embeddings = OllamaEmbeddings(model=model, base_url=ollama_url)
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
@@ -84,7 +86,7 @@ def initialize(model: str = "llama3.2", docs_dir: str = "./docs", persist_dir: s
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
     print("🤖 Setting up LLM...")
-    llm = Ollama(model=model, temperature=0)
+    llm = Ollama(model=model, base_url=ollama_url, temperature=0)
 
     contextualize_prompt = ChatPromptTemplate.from_messages([
         ("system",
