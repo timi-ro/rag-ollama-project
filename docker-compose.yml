@@ -38,6 +38,8 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
 
   streamlit:
     build: .
@@ -52,6 +54,8 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
 
 volumes:
   ollama_data:
