@@ -54,6 +54,9 @@ rag-ollama-project/
 │   └── database.py          # SQLAlchemy models (sites, request_logs)
 ├── middleware/
 │   └── auth.py              # API key + admin auth dependencies
+├── Dockerfile               # Container image for rag-api
+├── docker-compose.yml       # Full stack (API + Ollama + WordPress + MySQL)
+├── .dockerignore            # Docker build exclusions
 ├── .env.example             # Environment variables template
 ├── requirements.txt         # Python dependencies
 └── chroma_db/               # Vector database (auto-generated)
@@ -61,54 +64,76 @@ rag-ollama-project/
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option A — Docker (Recommended)
 
-1. Install [Ollama](https://ollama.com)
-2. Python 3.10 or higher
+Runs the full stack: RAG API + Ollama + WordPress + MySQL.
 
-### Installation
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) + Docker Compose
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/timi-ro/rag-ollama-project.git
 cd rag-ollama-project
 
-# 2. Create virtual environment
+# 2. Start all services
+docker compose up -d
+
+# 3. Pull the Ollama model (one-time, ~2GB)
+docker exec -it $(docker compose ps -q ollama) ollama pull llama3.2
+```
+
+| Service | URL |
+|---------|-----|
+| RAG API | `http://localhost:8000` |
+| API Docs | `http://localhost:8000/docs` |
+| WordPress | `http://localhost:8080` |
+
+> **Note:** From WordPress PHP (server-side), call the API using the internal hostname: `http://rag-api:8000`
+
+---
+
+### Option B — Local (without Docker)
+
+**Prerequisites:** [Ollama](https://ollama.com) + Python 3.10+
+
+```bash
+# 1. Clone and set up
+git clone https://github.com/timi-ro/rag-ollama-project.git
+cd rag-ollama-project
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# 3. Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
-
-# 4. Pull Ollama model
 ollama pull llama3.2
+
+# 2. Set up environment
+cp .env.example .env   # edit values as needed
 ```
 
 ## 💡 Usage
 
-### Web Interface
+### REST API
+
+```bash
+# Docker
+docker compose up -d
+
+# Local
+uvicorn api:app --reload
+```
+
+The database (`sites.db`) is created automatically on first startup.
+
+### Web Interface (local only)
 
 ```bash
 streamlit run app.py
 ```
 
-### CLI Mode
+### CLI Mode (local only)
 
 ```bash
 python main.py
 ```
-
-### REST API
-
-```bash
-# 1. Set up environment
-cp .env.example .env   # edit values as needed
-
-# 2. Start the server
-uvicorn api:app --reload
-```
-
-The database is created automatically on first startup. Interactive docs at `http://localhost:8000/docs`.
 
 ## 🔧 API Reference
 
