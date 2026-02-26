@@ -25,6 +25,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+sites.db
 
 # Tenant config (contains API keys)
 config.json
