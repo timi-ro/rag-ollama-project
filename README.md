@@ -19,6 +19,19 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 🚦 **Rate Limiting** - 60 requests/minute per site
 - 🐳 **Docker Support** - Full stack with one command
 
+## 🎯 Use Cases
+
+This system is designed to be a **shared AI backend** that multiple independent clients can connect to, each with their own isolated knowledge base:
+
+- **WordPress Multisite** — each sub-site gets its own documents and chatbot
+- **SaaS platforms** — embed a knowledgeable chatbot per customer account
+- **Agency hosting** — one server powering chatbots for multiple client websites
+- **Internal tools** — different teams ingest their own docs and query independently
+- **E-commerce** — product/FAQ chatbot per store with isolated product data
+- **Documentation sites** — question-answering over technical docs per project
+
+Each tenant is fully isolated — one site can never access another site's data.
+
 ## 🛠️ Tech Stack
 
 - **LangChain** - RAG framework
