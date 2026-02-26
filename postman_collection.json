@@ -1,0 +1,162 @@
+{
+  "info": {
+    "name": "RAG API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "api_key", "value": "your-site-api-key-here" },
+    { "key": "admin_secret", "value": "change-me-in-production" },
+    { "key": "site_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Create Site",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/admin/sites",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\",\n  \"message_limit\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "List Sites",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/sites",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "Deactivate Site",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/admin/sites/{{site_id}}/deactivate",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "Update Plan",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/admin/sites/{{site_id}}/plan",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"pro\",\n  \"message_limit\": 1000\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ingest",
+      "item": [
+        {
+          "name": "Ingest Text",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/text",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Your page or post content goes here.\",\n  \"doc_id\": \"page-123\",\n  \"title\": \"About Us\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Ingest File",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/file",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/ingest/page-123",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Ask a Question",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What services do you offer?\",\n  \"conversation_history\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Ask with History",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Can you elaborate on that?\",\n  \"conversation_history\": [\n    { \"role\": \"user\", \"content\": \"What services do you offer?\" },\n    { \"role\": \"assistant\", \"content\": \"We offer consulting and development services.\" }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
