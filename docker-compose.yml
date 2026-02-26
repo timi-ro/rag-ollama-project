@@ -6,21 +6,13 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    entrypoint: ["/bin/bash", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
     healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
-  ollama-pull:
-    image: ollama/ollama
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-    command: ollama pull llama3.2
-    depends_on:
-      ollama:
-        condition: service_healthy
+      test: ["CMD", "/bin/bash", "-c", "ollama list | grep llama3.2"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   rag-api:
     build: .
@@ -38,8 +30,6 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
-      ollama-pull:
-        condition: service_completed_successfully
 
   streamlit:
     build: .
@@ -54,8 +44,6 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
-      ollama-pull:
-        condition: service_completed_successfully
 
 volumes:
   ollama_data:
