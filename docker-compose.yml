@@ -13,6 +13,15 @@ services:
       retries: 10
       start_period: 20s
 
+  ollama-pull:
+    image: ollama/ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ollama pull llama3.2
+    depends_on:
+      ollama:
+        condition: service_healthy
+
   rag-api:
     build: .
     ports:
