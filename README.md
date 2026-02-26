@@ -86,6 +86,7 @@ docker exec -it $(docker compose ps -q ollama) ollama pull llama3.2
 |---------|-----|
 | RAG API | `http://localhost:8000` |
 | API Docs | `http://localhost:8000/docs` |
+| Streamlit UI | `http://localhost:8501` |
 
 > **WordPress integration:** Point your WP plugin to `http://<your-server-ip>:8000`. The API is fully external — WordPress is not part of this project.
 
