@@ -1,26 +1,23 @@
 # 🤖 Local RAG System with Ollama & LangChain
 
-A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** - completely local, no API keys required!
+A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** — completely local, no API keys required.
 
 ## ✨ Features
 
 - 🆓 **100% Free** - No API keys, no payment methods
 - 🏠 **Runs Locally** - Complete privacy, works offline
-- ⚡ **Fast** - Uses Ollama's optimized local models
-- 🔒 **Secure** - Your data never leaves your machine
-- 📚 **Smart Document Search** - Semantic retrieval with vector embeddings
-- 💬 **Interactive Chat** - Ask questions about your documents
-- 🧠 **Conversation History** - Follow-up questions with context awareness
-- 🌐 **Web Interface** - Streamlit-powered chat UI
-- 📄 **Multi-Format Support** - Load PDFs, Word docs, HTML, CSV, Markdown, and text files
 - ⚡ **Streaming Responses** - Answers stream token by token in real time
 - 📎 **Source Citations** - Every answer shows which documents it came from
+- 🧠 **Conversation History** - Follow-up questions with context awareness
+- 🌐 **Web Interface** - Streamlit-powered chat UI
+- 📄 **Multi-Format Support** - PDF, Word, HTML, CSV, Markdown, TXT
 - 🔌 **REST API** - FastAPI backend for integrating with external apps
-- 🏢 **Multi-Tenant** - Each site gets isolated documents and vector store
-- 📤 **Document Ingestion API** - Ingest text or files per tenant via API
-- 🔑 **API Key Auth** - Secure per-site access control with hashed keys
+- 🏢 **Multi-Tenant** - Each client gets isolated documents and vector store
+- 📤 **Document Ingestion API** - Ingest text or files per tenant
+- 🔑 **API Key Auth** - Per-site access control with hashed keys
 - 📊 **Plan & Usage Limits** - Per-site message limits with free/pro plans
 - 🚦 **Rate Limiting** - 60 requests/minute per site
+- 🐳 **Docker Support** - Full stack with one command
 
 ## 🛠️ Tech Stack
 
@@ -32,6 +29,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - **slowapi** - Rate limiting
 - **Streamlit** - Web chat interface
 - **PyPDF** - PDF processing
+- **Docker** - Containerization
 - **Python 3.10+**
 
 ## 📁 Project Structure
@@ -39,7 +37,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 ```
 rag-ollama-project/
 ├── api.py                   # FastAPI app entry point
-├── main.py                  # Local CLI usage
+├── main.py                  # Core RAG logic (used by Streamlit + CLI)
 ├── app.py                   # Streamlit web interface
 ├── routers/
 │   ├── status.py            # GET /status
@@ -53,20 +51,17 @@ rag-ollama-project/
 ├── models/
 │   └── database.py          # SQLAlchemy models (sites, request_logs)
 ├── middleware/
-│   └── auth.py              # API key + admin auth dependencies
-├── Dockerfile               # Container image for rag-api
-├── docker-compose.yml       # Full stack (API + Ollama + WordPress + MySQL)
-├── .dockerignore            # Docker build exclusions
-├── .env.example             # Environment variables template
-├── requirements.txt         # Python dependencies
-└── chroma_db/               # Vector database (auto-generated)
+│   └── auth.py              # API key + admin auth
+├── Dockerfile               # Container image
+├── docker-compose.yml       # Ollama + RAG API + Streamlit
+├── .dockerignore
+├── .env.example
+└── requirements.txt
 ```
 
 ## 🚀 Quick Start
 
 ### Option A — Docker (Recommended)
-
-Runs the full stack: RAG API + Ollama + WordPress + MySQL.
 
 **Prerequisites:** [Docker](https://docs.docker.com/get-docker/) + Docker Compose
 
@@ -84,54 +79,34 @@ docker exec -it $(docker compose ps -q ollama) ollama pull llama3.2
 
 | Service | URL |
 |---------|-----|
+| Streamlit UI | `http://localhost:8501` |
 | RAG API | `http://localhost:8000` |
 | API Docs | `http://localhost:8000/docs` |
-| Streamlit UI | `http://localhost:8501` |
-
-> **WordPress integration:** Point your WP plugin to `http://<your-server-ip>:8000`. The API is fully external — WordPress is not part of this project.
 
 ---
 
-### Option B — Local (without Docker)
+### Option B — Local
 
 **Prerequisites:** [Ollama](https://ollama.com) + Python 3.10+
 
 ```bash
-# 1. Clone and set up
 git clone https://github.com/timi-ro/rag-ollama-project.git
 cd rag-ollama-project
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ollama pull llama3.2
-
-# 2. Set up environment
-cp .env.example .env   # edit values as needed
+cp .env.example .env
 ```
 
-## 💡 Usage
-
-### REST API
-
 ```bash
-# Docker
-docker compose up -d
-
-# Local
+# REST API
 uvicorn api:app --reload
-```
 
-The database (`sites.db`) is created automatically on first startup.
-
-### Web Interface (local only)
-
-```bash
+# Streamlit UI
 streamlit run app.py
-```
 
-### CLI Mode (local only)
-
-```bash
+# CLI
 python main.py
 ```
 
@@ -158,8 +133,8 @@ X-Admin-Secret: <your-admin-secret>
 | `POST` | `/ingest/text` | API Key | Ingest raw text |
 | `POST` | `/ingest/file` | API Key | Upload PDF or TXT file |
 | `DELETE` | `/ingest/{doc_id}` | API Key | Delete a document |
-| `POST` | `/admin/sites` | Admin | Create a site + get API key |
-| `GET` | `/admin/sites` | Admin | List all sites with usage |
+| `POST` | `/admin/sites` | Admin | Create a site and get API key |
+| `GET` | `/admin/sites` | Admin | List all sites with usage stats |
 | `PATCH` | `/admin/sites/{id}/deactivate` | Admin | Deactivate a site |
 | `PATCH` | `/admin/sites/{id}/plan` | Admin | Update plan and message limit |
 
@@ -169,36 +144,30 @@ X-Admin-Secret: <your-admin-secret>
 curl -X POST http://localhost:8000/admin/sites \
   -H "X-Admin-Secret: your-admin-secret" \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-wordpress-site", "plan": "pro", "message_limit": 1000}'
+  -d '{"name": "my-site", "plan": "free", "message_limit": 100}'
 ```
 
-Returns the API key (shown only once):
+Returns the API key — shown only once:
 ```json
-{
-  "site_id": 1,
-  "name": "my-wordpress-site",
-  "api_key": "...",
-  "plan": "pro",
-  "message_limit": 1000
-}
+{ "site_id": 1, "name": "my-site", "api_key": "...", "plan": "free", "message_limit": 100 }
 ```
 
-### Example: Ingest content
+### Example: Ingest text
 
 ```bash
 curl -X POST http://localhost:8000/ingest/text \
-  -H "X-API-Key: <site-api-key>" \
+  -H "X-API-Key: <api-key>" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Your page content...", "doc_id": "page-123", "title": "About Us"}'
+  -d '{"content": "Your content here.", "doc_id": "doc-1", "title": "Home Page"}'
 ```
 
 ### Example: Chat
 
 ```bash
 curl -X POST http://localhost:8000/chat \
-  -H "X-API-Key: <site-api-key>" \
+  -H "X-API-Key: <api-key>" \
   -H "Content-Type: application/json" \
-  -d '{"question": "What services do you offer?", "conversation_history": []}'
+  -d '{"question": "What do you offer?", "conversation_history": []}'
 ```
 
 ## ⚙️ Environment Variables
@@ -214,34 +183,28 @@ curl -X POST http://localhost:8000/chat \
 
 ## 🐛 Troubleshooting
 
-### Ollama Not Running
+### Ollama not running
 ```bash
 ollama serve
 ```
 
-### Model Not Found
+### Model not found
 ```bash
 ollama pull llama3.2
 ```
 
-### Slow First Request
-
-First request per site builds the vector index. Subsequent requests are fast.
+### Slow first request
+First request per site builds the vector index — subsequent requests are fast.
 
 ## 📝 License
 
-MIT License - Feel free to use this for your projects!
+MIT License
 
 ## 👤 Author
 
 **Fatima**
 - Backend Developer | AI Enthusiast
 - LinkedIn: [linkedin.com/in/frostami](https://www.linkedin.com/in/frostami/)
-
-## 🙏 Acknowledgments
-
-- Built with [LangChain](https://python.langchain.com/)
-- Powered by [Ollama](https://ollama.com/)
 
 ---
 
