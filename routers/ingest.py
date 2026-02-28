@@ -10,7 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from middleware.auth import get_site
 from models.database import Site
 from services.embedding import get_embeddings
-from services.vectorstore import upsert_chunks, delete_doc_chunks
+from services.vectorstore import upsert_chunks, delete_doc_chunks, list_docs
 
 router = APIRouter(prefix="/ingest")
 
@@ -59,6 +59,11 @@ async def ingest_file(file: UploadFile = File(...), site: Site = Depends(get_sit
     finally:
         os.unlink(tmp_path)
     return {"ingested": len(all_chunks), "doc_id": file.filename}
+
+
+@router.get("/documents")
+def list_documents(site: Site = Depends(get_site)):
+    return {"documents": list_docs(site.id)}
 
 
 @router.delete("/{doc_id}")

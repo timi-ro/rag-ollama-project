@@ -54,7 +54,7 @@ rag-ollama-project/
 ├── app.py                   # Streamlit web interface
 ├── routers/
 │   ├── status.py            # GET /status
-│   ├── ingest.py            # POST /ingest/text, /ingest/file, DELETE /ingest/{doc_id}
+│   ├── ingest.py            # POST /ingest/text, /ingest/file, GET /ingest/documents, DELETE /ingest/{doc_id}
 │   ├── chat.py              # POST /chat
 │   └── admin.py             # Admin site management
 ├── services/
@@ -145,6 +145,7 @@ X-Admin-Secret: <your-admin-secret>
 | `POST` | `/chat` | API Key | Ask a question |
 | `POST` | `/ingest/text` | API Key | Ingest raw text |
 | `POST` | `/ingest/file` | API Key | Upload PDF or TXT file |
+| `GET` | `/ingest/documents` | API Key | List all ingested documents for the site |
 | `DELETE` | `/ingest/{doc_id}` | API Key | Delete a document |
 | `POST` | `/admin/sites` | Admin | Create a site and get API key |
 | `GET` | `/admin/sites` | Admin | List all sites with usage stats |

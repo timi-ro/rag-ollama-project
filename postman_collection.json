@@ -112,6 +112,16 @@
           }
         },
         {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/ingest/documents",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
+          }
+        },
+        {
           "name": "Delete Document",
           "request": {
             "method": "DELETE",

@@ -50,6 +50,21 @@ def query_chunks(site_id: int, embedding: list, n_results: int = 5) -> dict:
     )
 
 
+def list_docs(site_id: int) -> list[dict]:
+    collection = _get_collection()
+    result = collection.get(
+        where={"site_id": str(site_id)},
+        include=["metadatas"],
+    )
+    seen = {}
+    for meta in result.get("metadatas") or []:
+        doc_id = meta["doc_id"]
+        if doc_id not in seen:
+            seen[doc_id] = {"doc_id": doc_id, "title": meta.get("title", "")}
+        seen[doc_id]["chunk_count"] = seen[doc_id].get("chunk_count", 0) + 1
+    return list(seen.values())
+
+
 def delete_doc_chunks(site_id: int, doc_id: str):
     collection = _get_collection()
     try:
