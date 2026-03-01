@@ -5,7 +5,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 
 from models.database import init_db
-from routers import status, ingest, chat, admin
+from routers import status, ingest, chat, admin, usage
 
 
 def get_api_key(request: Request) -> str:
@@ -40,3 +40,4 @@ app.include_router(status.router)
 app.include_router(ingest.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(usage.router)

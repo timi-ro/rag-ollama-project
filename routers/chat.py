@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
 
 from middleware.auth import get_site
 from models.database import SessionLocal, Site, RequestLog
 from services.embedding import get_embeddings
+from services.plans import get_plan_config, get_usage_count
 from services.vectorstore import query_chunks
 from services.llm import get_llm, generate_answer
 
@@ -20,14 +20,21 @@ class ChatRequest(BaseModel):
 def chat(req: ChatRequest, site: Site = Depends(get_site)):
     db = SessionLocal()
     try:
-        # Check message limit
-        used = db.query(func.count(RequestLog.id)).filter(
-            RequestLog.site_id == site.id,
-            RequestLog.endpoint == "/chat",
-            RequestLog.status_code == 200,
-        ).scalar()
-        if used >= site.message_limit:
-            raise HTTPException(status_code=429, detail={"error": "PLAN_LIMIT_REACHED"})
+        # Re-fetch site so SQLAlchemy tracks any mutations (e.g. period_start reset)
+        site = db.query(Site).filter(Site.id == site.id).first()
+
+        config = get_plan_config(site.plan)
+        if not config["unlimited"]:
+            used, was_reset = get_usage_count(site, db)
+            if was_reset:
+                db.commit()
+            if used >= site.message_limit:
+                raise HTTPException(status_code=429, detail={
+                    "error": "PLAN_LIMIT_REACHED",
+                    "plan": site.plan,
+                    "used": used,
+                    "limit": site.message_limit,
+                })
 
         # Embed question and retrieve relevant chunks
         question_embedding = get_embeddings().embed_query(req.question)

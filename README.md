@@ -147,10 +147,11 @@ X-Admin-Secret: <your-admin-secret>
 | `POST` | `/ingest/file` | API Key | Upload PDF or TXT file |
 | `GET` | `/ingest/documents` | API Key | List all ingested documents for the site |
 | `DELETE` | `/ingest/{doc_id}` | API Key | Delete a document |
+| `GET` | `/usage` | API Key | Get message usage for the current site |
 | `POST` | `/admin/sites` | Admin | Create a site and get API key |
 | `GET` | `/admin/sites` | Admin | List all sites with usage stats |
 | `PATCH` | `/admin/sites/{id}/deactivate` | Admin | Deactivate a site |
-| `PATCH` | `/admin/sites/{id}/plan` | Admin | Update plan and message limit |
+| `PATCH` | `/admin/sites/{id}/plan` | Admin | Update plan (auto-sets limit) |
 
 ### Example: Create a site
 
@@ -158,12 +159,12 @@ X-Admin-Secret: <your-admin-secret>
 curl -X POST http://localhost:8000/admin/sites \
   -H "X-Admin-Secret: your-admin-secret" \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-site", "plan": "free", "message_limit": 100}'
+  -d '{"name": "my-site", "plan": "free"}'
 ```
 
 Returns the API key — shown only once:
 ```json
-{ "site_id": 1, "name": "my-site", "api_key": "...", "plan": "free", "message_limit": 100 }
+{ "site_id": 1, "name": "my-site", "api_key": "...", "plan": "free", "message_limit": 20 }
 ```
 
 ### Example: Ingest text
@@ -193,7 +194,6 @@ curl -X POST http://localhost:8000/chat \
 | `CHROMA_DB_PATH` | `./chroma_db` | Vector store path |
 | `SQLITE_DB_PATH` | `./sites.db` | SQLite database path |
 | `ADMIN_SECRET` | `change-me-in-production` | Admin endpoint secret |
-| `DEFAULT_MESSAGE_LIMIT` | `100` | Default messages per site |
 
 ## 🐛 Troubleshooting
 

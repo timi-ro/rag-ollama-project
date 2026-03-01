@@ -20,6 +20,7 @@ class Site(Base):
     is_active = Column(Boolean, default=True)
     plan = Column(String, default="free")
     message_limit = Column(Integer, default=100)
+    period_start = Column(DateTime, nullable=True, default=None)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 

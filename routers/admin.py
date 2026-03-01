@@ -1,5 +1,5 @@
+import datetime
 import hashlib
-import os
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +8,7 @@ from sqlalchemy import func
 
 from middleware.auth import get_admin
 from models.database import SessionLocal, Site, RequestLog
+from services.plans import get_plan_config
 
 router = APIRouter(prefix="/admin")
 
@@ -15,25 +16,31 @@ router = APIRouter(prefix="/admin")
 class CreateSiteRequest(BaseModel):
     name: str
     plan: str = "free"
-    message_limit: int = int(os.getenv("DEFAULT_MESSAGE_LIMIT", 100))
 
 
 class UpdatePlanRequest(BaseModel):
     plan: str
-    message_limit: int
 
 
 @router.post("/sites")
 def create_site(req: CreateSiteRequest, _=Depends(get_admin)):
+    try:
+        config = get_plan_config(req.plan)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     raw_key = secrets.token_urlsafe(32)
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    period_start = datetime.datetime.utcnow() if req.plan == "pro" else None
+
     db = SessionLocal()
     try:
         site = Site(
             name=req.name,
             api_key_hash=key_hash,
             plan=req.plan,
-            message_limit=req.message_limit,
+            message_limit=config["limit"],
+            period_start=period_start,
         )
         db.add(site)
         db.commit()
@@ -43,7 +50,7 @@ def create_site(req: CreateSiteRequest, _=Depends(get_admin)):
             "name": site.name,
             "api_key": raw_key,
             "plan": site.plan,
-            "message_limit": site.message_limit,
+            "message_limit": config["limit"],
         }
     finally:
         db.close()
@@ -89,14 +96,20 @@ def deactivate_site(site_id: int, _=Depends(get_admin)):
 
 @router.patch("/sites/{site_id}/plan")
 def update_plan(site_id: int, req: UpdatePlanRequest, _=Depends(get_admin)):
+    try:
+        config = get_plan_config(req.plan)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     db = SessionLocal()
     try:
         site = db.query(Site).filter(Site.id == site_id).first()
         if not site:
             raise HTTPException(status_code=404, detail="Site not found")
         site.plan = req.plan
-        site.message_limit = req.message_limit
+        site.message_limit = config["limit"]
+        site.period_start = datetime.datetime.utcnow() if req.plan == "pro" else None
         db.commit()
-        return {"site_id": site_id, "plan": site.plan, "message_limit": site.message_limit}
+        return {"site_id": site_id, "plan": site.plan, "message_limit": config["limit"]}
     finally:
         db.close()

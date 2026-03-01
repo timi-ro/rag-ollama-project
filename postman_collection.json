@@ -71,7 +71,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"pro\",\n  \"message_limit\": 1000\n}"
+              "raw": "{\n  \"plan\": \"pro\"\n}"
             }
           }
         }
@@ -126,6 +126,21 @@
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/ingest/page-123",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usage",
+      "item": [
+        {
+          "name": "Get Usage",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/usage",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ]
