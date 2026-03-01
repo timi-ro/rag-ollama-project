@@ -1,5 +1,5 @@
-import hashlib
 import os
+import bcrypt
 from fastapi import Header, HTTPException
 from models.database import SessionLocal, Site
 from dotenv import load_dotenv
@@ -9,16 +9,16 @@ load_dotenv()
 
 def get_site(x_api_key: str = Header(..., alias="X-API-Key")) -> Site:
     """Validate X-API-Key and return the matching Site."""
-    key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
+    prefix = x_api_key[:8]
     db = SessionLocal()
     try:
         site = db.query(Site).filter(
-            Site.api_key_hash == key_hash,
+            Site.api_key_prefix == prefix,
             Site.is_active == True,
         ).first()
     finally:
         db.close()
-    if not site:
+    if not site or not bcrypt.checkpw(x_api_key.encode(), site.api_key_hash.encode()):
         raise HTTPException(status_code=401, detail={"error": "INVALID_API_KEY"})
     return site
 

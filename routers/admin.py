@@ -1,6 +1,6 @@
 import datetime
-import hashlib
 import secrets
+import bcrypt
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -30,13 +30,14 @@ def create_site(req: CreateSiteRequest, _=Depends(get_admin)):
         raise HTTPException(status_code=400, detail=str(e))
 
     raw_key = secrets.token_urlsafe(32)
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_hash = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
     period_start = datetime.datetime.utcnow() if req.plan == "pro" else None
 
     db = SessionLocal()
     try:
         site = Site(
             name=req.name,
+            api_key_prefix=raw_key[:8],
             api_key_hash=key_hash,
             plan=req.plan,
             message_limit=config["limit"],
