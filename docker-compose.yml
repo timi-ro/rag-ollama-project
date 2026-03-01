@@ -23,8 +23,8 @@ services:
       OLLAMA_MODEL: llama3.2
       CHROMA_DB_PATH: /app/data/chroma_db
       SQLITE_DB_PATH: /app/data/sites.db
-      ADMIN_SECRET: admin123
-      DEFAULT_MESSAGE_LIMIT: 100
+    env_file:
+      - .env
     volumes:
       - rag_data:/app/data
     depends_on:
