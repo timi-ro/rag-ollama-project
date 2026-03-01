@@ -17,6 +17,7 @@ router = APIRouter(prefix="/ingest")
 _splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))  # default 10 MB
 
 
 class IngestTextRequest(BaseModel):
@@ -43,8 +44,14 @@ async def ingest_file(file: UploadFile = File(...), site: Site = Depends(get_sit
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Supported: {', '.join(SUPPORTED_EXTENSIONS)}",
         )
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
     with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-        tmp.write(await file.read())
+        tmp.write(contents)
         tmp_path = tmp.name
     try:
         loader = PyPDFLoader(tmp_path) if ext == ".pdf" else TextLoader(tmp_path)
