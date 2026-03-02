@@ -1,5 +1,6 @@
 import os
 import datetime
+from datetime import timezone
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ class Site(Base):
     plan = Column(String, default="free")
     message_limit = Column(Integer, default=100)
     period_start = Column(DateTime, nullable=True, default=None)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(timezone.utc))
 
 
 class RequestLog(Base):
@@ -31,7 +32,7 @@ class RequestLog(Base):
     site_id = Column(Integer, nullable=False)
     endpoint = Column(String)
     status_code = Column(Integer)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(timezone.utc))
 
 
 def init_db():

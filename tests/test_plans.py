@@ -1,4 +1,5 @@
 import datetime
+from datetime import timezone
 
 import pytest
 
@@ -72,7 +73,7 @@ def test_usage_count_enterprise():
 
 def test_usage_count_pro_within_period():
     session = TestSession()
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(timezone.utc)
     site = Site(
         name="t", api_key_prefix="dddddddd", api_key_hash="hash4",
         plan="pro", message_limit=2000, period_start=now,
@@ -91,7 +92,7 @@ def test_usage_count_pro_within_period():
 
 def test_usage_count_pro_expired_resets():
     session = TestSession()
-    old_date = datetime.datetime.utcnow() - datetime.timedelta(days=31)
+    old_date = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=31)
     site = Site(
         name="t", api_key_prefix="eeeeeeee", api_key_hash="hash5",
         plan="pro", message_limit=2000, period_start=old_date,

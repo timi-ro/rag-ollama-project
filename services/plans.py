@@ -1,4 +1,5 @@
 import datetime
+from datetime import timezone
 
 from sqlalchemy import func
 
@@ -25,7 +26,7 @@ def get_usage_count(site, db) -> tuple:
         return (0, False)
 
     if site.plan == "pro":
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(timezone.utc)
         was_reset = False
         if site.period_start is None or (now - site.period_start).days >= 30:
             site.period_start = now

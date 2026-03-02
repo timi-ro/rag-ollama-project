@@ -1,5 +1,7 @@
 import bcrypt
+import datetime
 import pytest
+from datetime import timezone
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -73,7 +75,7 @@ def pro_site():
         api_key_hash=key_hash,
         plan="pro",
         message_limit=2000,
-        period_start=datetime.datetime.utcnow(),
+        period_start=datetime.datetime.now(timezone.utc),
     )
     session.add(site)
     session.commit()

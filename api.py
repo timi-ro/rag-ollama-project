@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,11 +20,14 @@ app = FastAPI(title="RAG API", version="1.0.0")
 
 app.state.limiter = limiter
 
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["X-API-Key", "X-Admin-Secret", "Content-Type"],
 )
 
 

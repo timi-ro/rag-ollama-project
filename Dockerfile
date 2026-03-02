@@ -13,7 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p docs
+RUN mkdir -p docs && \
+    addgroup --system appgroup && \
+    adduser --system --ingroup appgroup appuser && \
+    chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 8000
 
