@@ -55,9 +55,9 @@ def chat(req: ChatRequest, site: Site = Depends(get_site)):
         return {"answer": answer, "sources": sources}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.add(RequestLog(site_id=site.id, endpoint="/chat", status_code=500))
         db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         db.close()

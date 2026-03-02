@@ -1,3 +1,4 @@
+import hmac
 import os
 import bcrypt
 from fastapi import Header, HTTPException
@@ -26,6 +27,6 @@ def get_site(x_api_key: str = Header(..., alias="X-API-Key")) -> Site:
 def get_admin(x_admin_secret: str = Header(..., alias="X-Admin-Secret")) -> bool:
     """Validate X-Admin-Secret for admin endpoints."""
     admin_secret = os.getenv("ADMIN_SECRET", "change-me-in-production")
-    if x_admin_secret != admin_secret:
+    if not hmac.compare_digest(x_admin_secret, admin_secret):
         raise HTTPException(status_code=401, detail={"error": "INVALID_ADMIN_SECRET"})
     return True
