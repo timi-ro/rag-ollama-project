@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -18,6 +19,16 @@ _splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))  # default 10 MB
+
+
+def _safe_doc_id(filename: str) -> str:
+    """Return a sanitized doc_id from an upload filename.
+
+    Strips directory components and replaces any character that is not
+    alphanumeric, a dash, underscore, or dot with an underscore.
+    """
+    bare = Path(filename).name  # drop any path traversal components
+    return re.sub(r"[^\w.\-]", "_", bare)[:255]
 
 
 class IngestTextRequest(BaseModel):
@@ -62,10 +73,11 @@ async def ingest_file(file: UploadFile = File(...), site: Site = Depends(get_sit
         if not all_chunks:
             raise HTTPException(status_code=400, detail="File produced no chunks")
         embeddings = get_embeddings().embed_documents(all_chunks)
-        upsert_chunks(site.id, file.filename, file.filename, all_chunks, embeddings)
+        doc_id = _safe_doc_id(file.filename)
+        upsert_chunks(site.id, doc_id, doc_id, all_chunks, embeddings)
     finally:
         os.unlink(tmp_path)
-    return {"ingested": len(all_chunks), "doc_id": file.filename}
+    return {"ingested": len(all_chunks), "doc_id": doc_id}
 
 
 @router.get("/documents")
