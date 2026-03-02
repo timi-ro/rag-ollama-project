@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Annotated
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -31,9 +32,12 @@ def _safe_doc_id(filename: str) -> str:
     return re.sub(r"[^\w.\-]", "_", bare)[:255]
 
 
+MAX_DOC_ID_CHARS = 255
+
+
 class IngestTextRequest(BaseModel):
-    content: str
-    doc_id: str
+    content: Annotated[str, Field(min_length=1, max_length=MAX_UPLOAD_BYTES)]
+    doc_id: Annotated[str, Field(min_length=1, max_length=MAX_DOC_ID_CHARS, pattern=r"^[\w.\-]+$")]
     title: str = ""
 
 

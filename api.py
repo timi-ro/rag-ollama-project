@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from models.database import init_db
 from routers import status, ingest, chat, admin, usage
@@ -19,6 +20,7 @@ limiter = Limiter(key_func=get_api_key, default_limits=["60/minute"])
 app = FastAPI(title="RAG API", version="1.0.0")
 
 app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
@@ -36,8 +38,16 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse({"error": "RATE_LIMIT_EXCEEDED"}, status_code=429)
 
 
+_INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
+
 @app.on_event("startup")
 def startup():
+    secret = os.getenv("ADMIN_SECRET", "")
+    if secret in _INSECURE_SECRET_DEFAULTS:
+        raise RuntimeError(
+            "ADMIN_SECRET env var is not set or is still the default placeholder. "
+            "Set a strong secret before starting the server."
+        )
     init_db()
 
 

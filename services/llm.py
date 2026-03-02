@@ -20,8 +20,10 @@ def generate_answer(llm: Ollama, question: str, context: str, conversation_histo
     history_text = ""
     if conversation_history:
         for msg in conversation_history:
-            role = "User" if msg.get("role") == "user" else "Assistant"
-            history_text += f"{role}: {msg.get('content', '')}\n"
+            role_raw = msg.get("role") if isinstance(msg, dict) else getattr(msg, "role", "")
+            content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+            role = "User" if role_raw == "user" else "Assistant"
+            history_text += f"{role}: {content}\n"
 
     prompt = f"""You are a helpful assistant. Use the following context to answer the question.
 If you don't know the answer based on the context, say so.

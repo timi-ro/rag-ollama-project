@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Annotated
+from typing import Annotated, Literal
 
 from middleware.auth import get_site
 from models.database import SessionLocal, Site, RequestLog
@@ -13,11 +13,17 @@ router = APIRouter()
 
 MAX_QUESTION_CHARS = 4096
 MAX_HISTORY_TURNS = 20
+MAX_HISTORY_MSG_CHARS = 4096
+
+
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: Annotated[str, Field(max_length=MAX_HISTORY_MSG_CHARS)]
 
 
 class ChatRequest(BaseModel):
     question: Annotated[str, Field(min_length=1, max_length=MAX_QUESTION_CHARS)]
-    conversation_history: Annotated[list[dict], Field(max_length=MAX_HISTORY_TURNS)] = []
+    conversation_history: Annotated[list[HistoryMessage], Field(max_length=MAX_HISTORY_TURNS)] = []
 
 
 @router.post("/chat")
