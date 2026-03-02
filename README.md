@@ -83,10 +83,15 @@ rag-ollama-project/
 git clone https://github.com/timi-ro/rag-ollama-project.git
 cd rag-ollama-project
 
-# 2. Start all services
+# 2. Configure environment (required — server will not start without ADMIN_SECRET)
+cp .env.example .env
+# Edit .env and set ADMIN_SECRET to a strong random value:
+# python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# 3. Start all services
 docker compose up -d
 
-# 3. Pull the Ollama model (one-time, ~2GB)
+# 4. Pull the Ollama model (one-time, ~2GB)
 docker exec -it $(docker compose ps -q ollama) ollama pull llama3.2
 ```
 
@@ -110,6 +115,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ollama pull llama3.2
 cp .env.example .env
+# Edit .env and set ADMIN_SECRET before starting the server
 ```
 
 ```bash
@@ -182,8 +188,16 @@ curl -X POST http://localhost:8000/ingest/text \
 curl -X POST http://localhost:8000/chat \
   -H "X-API-Key: <api-key>" \
   -H "Content-Type: application/json" \
-  -d '{"question": "What do you offer?", "conversation_history": []}'
+  -d '{
+    "question": "What do you offer?",
+    "conversation_history": [
+      {"role": "user",      "content": "Hi!"},
+      {"role": "assistant", "content": "Hello! How can I help?"}
+    ]
+  }'
 ```
+
+`conversation_history` is optional. Each message must have `role` (`"user"` or `"assistant"`) and `content` (max 4096 chars). The list is capped at 20 turns.
 
 ## ⚙️ Environment Variables
 
@@ -193,7 +207,9 @@ curl -X POST http://localhost:8000/chat \
 | `OLLAMA_MODEL` | `llama3.2` | Default model |
 | `CHROMA_DB_PATH` | `./chroma_db` | Vector store path |
 | `SQLITE_DB_PATH` | `./sites.db` | SQLite database path |
-| `ADMIN_SECRET` | `change-me-in-production` | Admin endpoint secret |
+| `ADMIN_SECRET` | **required** | Secret for admin endpoints. The server refuses to start if unset or set to the placeholder value. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `ALLOWED_ORIGINS` | *(none)* | Comma-separated list of allowed CORS origins, e.g. `https://app.example.com`. Leave empty to block all cross-origin requests. |
+| `MAX_UPLOAD_BYTES` | `10485760` | Maximum file/text upload size in bytes (default 10 MB) |
 
 ## 🐛 Troubleshooting
 
