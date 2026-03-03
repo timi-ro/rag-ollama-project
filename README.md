@@ -6,7 +6,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 
 - 🆓 **100% Free** - No API keys, no payment methods
 - 🏠 **Runs Locally** - Complete privacy, works offline
-- ⚡ **Streaming Responses** - Answers stream token by token in real time
+- ⚡ **Fast Responses** - Optimised retrieval pipeline with ChromaDB
 - 📎 **Source Citations** - Every answer shows which documents it came from
 - 🧠 **Conversation History** - Follow-up questions with context awareness
 - 🌐 **Web Interface** - Streamlit-powered chat UI
@@ -16,7 +16,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 📤 **Document Ingestion API** - Ingest text or files per tenant
 - 🔑 **API Key Auth** - Per-site access control with hashed keys
 - 📊 **Plan & Usage Limits** - Per-site message limits with free/pro plans
-- 🚦 **Rate Limiting** - 60 requests/minute per site
+- 🚦 **Rate Limiting** - 60 requests/minute per API key
 - 🐳 **Docker Support** - Full stack with one command
 
 ## 🎯 Use Cases
@@ -131,73 +131,50 @@ python main.py
 
 ## 🔧 API Reference
 
+Interactive docs with all endpoints, request/response schemas, and a built-in try-it-out tool are available at:
+
+```
+http://localhost:8000/docs
+```
+
+The following sections cover behaviour that isn't visible in the auto-generated docs.
+
 ### Authentication
 
-All `/ingest/*` and `/chat` endpoints require:
+All `/ingest/*`, `/chat`, and `/usage` endpoints require:
 ```
 X-API-Key: <your-site-api-key>
 ```
 
-Admin endpoints require:
+Admin endpoints (`/admin/*`) require:
 ```
 X-Admin-Secret: <your-admin-secret>
 ```
 
-### Endpoints
+API keys are shown **only once** when a site is created and are not stored in plaintext. Save the key immediately — there is no way to retrieve it again.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/status` | None | Health check |
-| `POST` | `/chat` | API Key | Ask a question |
-| `POST` | `/ingest/text` | API Key | Ingest raw text |
-| `POST` | `/ingest/file` | API Key | Upload PDF or TXT file |
-| `GET` | `/ingest/documents` | API Key | List all ingested documents for the site |
-| `DELETE` | `/ingest/{doc_id}` | API Key | Delete a document |
-| `GET` | `/usage` | API Key | Get message usage for the current site |
-| `POST` | `/admin/sites` | Admin | Create a site and get API key |
-| `GET` | `/admin/sites` | Admin | List all sites with usage stats |
-| `PATCH` | `/admin/sites/{id}/deactivate` | Admin | Deactivate a site |
-| `PATCH` | `/admin/sites/{id}/plan` | Admin | Update plan (auto-sets limit) |
+### Plans
 
-### Example: Create a site
+| Plan | Message limit | Resets |
+|------|--------------|--------|
+| `free` | 20 (all-time) | Never |
+| `pro` | 2000 | Every 30 days (rolling) |
+| `enterprise` | Unlimited | — |
 
-```bash
-curl -X POST http://localhost:8000/admin/sites \
-  -H "X-Admin-Secret: your-admin-secret" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-site", "plan": "free"}'
-```
+Only successful `/chat` requests (HTTP 200) count toward the quota.
 
-Returns the API key — shown only once:
-```json
-{ "site_id": 1, "name": "my-site", "api_key": "...", "plan": "free", "message_limit": 20 }
-```
+### Rate limiting
 
-### Example: Ingest text
+60 requests/minute keyed on the `X-API-Key` header. Falls back to client IP if no key is present.
 
-```bash
-curl -X POST http://localhost:8000/ingest/text \
-  -H "X-API-Key: <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Your content here.", "doc_id": "doc-1", "title": "Home Page"}'
-```
+### Error responses
 
-### Example: Chat
-
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "X-API-Key: <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What do you offer?",
-    "conversation_history": [
-      {"role": "user",      "content": "Hi!"},
-      {"role": "assistant", "content": "Hello! How can I help?"}
-    ]
-  }'
-```
-
-`conversation_history` is optional. Each message must have `role` (`"user"` or `"assistant"`) and `content` (max 4096 chars). The list is capped at 20 turns.
+| Status | Body | Trigger |
+|--------|------|---------|
+| `401` | `{"error": "INVALID_API_KEY"}` | Missing or wrong `X-API-Key` |
+| `401` | `{"error": "INVALID_ADMIN_SECRET"}` | Missing or wrong `X-Admin-Secret` |
+| `429` | `{"error": "RATE_LIMIT_EXCEEDED"}` | Rate limit hit |
+| `429` | `{"error": "PLAN_LIMIT_REACHED", "plan": "...", "used": N, "limit": N}` | Message quota exhausted |
 
 ## ⚙️ Environment Variables
 
@@ -226,6 +203,25 @@ ollama pull llama3.2
 ### Slow first request
 First request per site builds the vector index — subsequent requests are fast.
 
+### Chatbot is very slow on macOS (Docker)
+Docker on macOS runs inside a Linux VM which has no access to Apple Silicon's Metal GPU. This means Ollama inside Docker falls back to CPU-only inference, making responses 5–10× slower than they should be.
+
+**Fix:** Run Ollama natively on your Mac instead of inside Docker, and point the containers at it:
+
+```bash
+# Install and start Ollama natively
+brew install ollama
+ollama serve
+ollama pull llama3.2
+```
+
+Then update `OLLAMA_BASE_URL` in `docker-compose.yml` to use the host:
+```yaml
+OLLAMA_BASE_URL: http://host.docker.internal:11434
+```
+
+And remove the `ollama` service from `docker-compose.yml`. Ollama running natively uses Metal GPU acceleration and is dramatically faster.
+
 ## 📝 License
 
 MIT License
@@ -239,3 +235,11 @@ MIT License
 ---
 
 ⭐ Star this repo if you find it useful!
+
+If this project saved you time or helped you build something cool, consider buying me a coffee, it keeps the projects coming!
+
+<p align="center">
+  <a href="https://buymeacoffee.com/ForetoldFatima">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="150" alt="Buy Me A Coffee">
+  </a>
+</p>
