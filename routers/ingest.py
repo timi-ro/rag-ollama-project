@@ -14,7 +14,7 @@ from models.database import Site
 from services.embedding import get_embeddings
 from services.vectorstore import upsert_chunks, delete_doc_chunks, list_docs
 
-router = APIRouter(prefix="/ingest")
+router = APIRouter(prefix="/ingest", tags=["ingest"])
 
 _splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
@@ -38,7 +38,7 @@ MAX_DOC_ID_CHARS = 255
 class IngestTextRequest(BaseModel):
     content: Annotated[str, Field(min_length=1, max_length=MAX_UPLOAD_BYTES)]
     doc_id: Annotated[str, Field(min_length=1, max_length=MAX_DOC_ID_CHARS, pattern=r"^[\w.\-]+$")]
-    title: str = ""
+    title: Annotated[str, Field(max_length=500)] = ""
 
 
 @router.post("/text")

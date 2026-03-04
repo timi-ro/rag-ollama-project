@@ -11,7 +11,7 @@ from middleware.auth import get_admin
 from models.database import SessionLocal, Site, RequestLog
 from services.plans import get_plan_config
 
-router = APIRouter(prefix="/admin")
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class CreateSiteRequest(BaseModel):

@@ -4,7 +4,7 @@ from middleware.auth import get_site
 from models.database import SessionLocal, Site
 from services.plans import get_plan_config, get_usage_count
 
-router = APIRouter()
+router = APIRouter(tags=["usage"])
 
 
 @router.get("/usage")

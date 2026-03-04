@@ -9,7 +9,7 @@ from services.plans import get_plan_config, get_usage_count
 from services.vectorstore import query_chunks
 from services.llm import get_llm, generate_answer
 
-router = APIRouter()
+router = APIRouter(tags=["chat"])
 
 MAX_QUESTION_CHARS = 4096
 MAX_HISTORY_TURNS = 20

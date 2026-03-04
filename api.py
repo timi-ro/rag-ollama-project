@@ -17,7 +17,21 @@ def get_api_key(request: Request) -> str:
 
 limiter = Limiter(key_func=get_api_key, default_limits=["60/minute"])
 
-app = FastAPI(title="RAG API", version="1.0.0")
+app = FastAPI(
+    title="RAG API",
+    version="1.0.0",
+    description=(
+        "A multi-tenant Retrieval-Augmented Generation API built with LangChain and Ollama. "
+        "Each site gets isolated document storage, API key authentication, and plan-based usage limits."
+    ),
+    openapi_tags=[
+        {"name": "status",    "description": "Health check"},
+        {"name": "chat",      "description": "Ask questions against your ingested documents"},
+        {"name": "ingest",    "description": "Upload and manage documents"},
+        {"name": "usage",     "description": "Query message quota and usage"},
+        {"name": "admin",     "description": "Admin-only site management"},
+    ],
+)
 
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
