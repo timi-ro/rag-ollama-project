@@ -6,9 +6,9 @@ from sqlalchemy import func
 from models.database import RequestLog
 
 PLAN_CONFIG = {
-    "free": {"limit": 20, "resets_monthly": False, "unlimited": False},
-    "pro": {"limit": 2000, "resets_monthly": True, "unlimited": False},
-    "enterprise": {"limit": None, "resets_monthly": False, "unlimited": True},
+    "free":       {"limit": 20,   "resets_monthly": False, "unlimited": False, "chunk_limit": 250},
+    "pro":        {"limit": 2000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 10_000},
+    "enterprise": {"limit": None, "resets_monthly": False, "unlimited": True,  "chunk_limit": None},
 }
 
 

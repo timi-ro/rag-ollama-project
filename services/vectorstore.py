@@ -65,6 +65,23 @@ def list_docs(site_id: int) -> list[dict]:
     return list(seen.values())
 
 
+def count_chunks(site_id: int) -> int:
+    """Return total number of chunks stored for a site."""
+    collection = _get_collection()
+    result = collection.get(where={"site_id": str(site_id)}, include=[])
+    return len(result["ids"])
+
+
+def count_doc_chunks(site_id: int, doc_id: str) -> int:
+    """Return number of chunks stored for a specific document."""
+    collection = _get_collection()
+    result = collection.get(
+        where={"$and": [{"site_id": str(site_id)}, {"doc_id": doc_id}]},
+        include=[],
+    )
+    return len(result["ids"])
+
+
 def delete_doc_chunks(site_id: int, doc_id: str):
     collection = _get_collection()
     try:

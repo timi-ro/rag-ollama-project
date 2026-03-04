@@ -12,7 +12,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from middleware.auth import get_site
 from models.database import Site
 from services.embedding import get_embeddings
-from services.vectorstore import upsert_chunks, delete_doc_chunks, list_docs
+from services.plans import get_plan_config
+from services.vectorstore import upsert_chunks, delete_doc_chunks, list_docs, count_chunks, count_doc_chunks
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
@@ -35,6 +36,30 @@ def _safe_doc_id(filename: str) -> str:
 MAX_DOC_ID_CHARS = 255
 
 
+def _check_chunk_limit(site, doc_id: str, new_chunk_count: int):
+    """Raise 413 if adding new_chunk_count chunks would exceed the plan limit.
+
+    Accounts for existing chunks of the same doc_id being replaced.
+    """
+    config = get_plan_config(site.plan)
+    chunk_limit = config["chunk_limit"]
+    if chunk_limit is None:
+        return
+    current_total = count_chunks(site.id)
+    existing_doc = count_doc_chunks(site.id, doc_id)
+    projected = (current_total - existing_doc) + new_chunk_count
+    if projected > chunk_limit:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "STORAGE_LIMIT_REACHED",
+                "chunk_limit": chunk_limit,
+                "chunks_used": current_total,
+                "chunks_available": max(0, chunk_limit - current_total + existing_doc),
+            },
+        )
+
+
 class IngestTextRequest(BaseModel):
     content: Annotated[str, Field(min_length=1, max_length=MAX_UPLOAD_BYTES)]
     doc_id: Annotated[str, Field(min_length=1, max_length=MAX_DOC_ID_CHARS, pattern=r"^[\w.\-]+$")]
@@ -46,6 +71,7 @@ def ingest_text(req: IngestTextRequest, site: Site = Depends(get_site)):
     chunks = _splitter.split_text(req.content)
     if not chunks:
         raise HTTPException(status_code=400, detail="Content produced no chunks")
+    _check_chunk_limit(site, req.doc_id, len(chunks))
     embeddings = get_embeddings().embed_documents(chunks)
     upsert_chunks(site.id, req.doc_id, req.title, chunks, embeddings)
     return {"ingested": len(chunks), "doc_id": req.doc_id}
@@ -76,8 +102,9 @@ async def ingest_file(file: UploadFile = File(...), site: Site = Depends(get_sit
             all_chunks.extend(_splitter.split_text(doc.page_content))
         if not all_chunks:
             raise HTTPException(status_code=400, detail="File produced no chunks")
-        embeddings = get_embeddings().embed_documents(all_chunks)
         doc_id = _safe_doc_id(file.filename)
+        _check_chunk_limit(site, doc_id, len(all_chunks))
+        embeddings = get_embeddings().embed_documents(all_chunks)
         upsert_chunks(site.id, doc_id, doc_id, all_chunks, embeddings)
     finally:
         os.unlink(tmp_path)

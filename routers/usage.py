@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from middleware.auth import get_site
 from models.database import SessionLocal, Site
 from services.plans import get_plan_config, get_usage_count
+from services.vectorstore import count_chunks
 
 router = APIRouter(tags=["usage"])
 
@@ -16,6 +17,9 @@ def get_usage(site: Site = Depends(get_site)):
 
         config = get_plan_config(site.plan)
 
+        chunks_used = count_chunks(site.id)
+        chunk_limit = config["chunk_limit"]
+
         if config["unlimited"]:
             return {
                 "plan": site.plan,
@@ -23,6 +27,11 @@ def get_usage(site: Site = Depends(get_site)):
                 "used": None,
                 "remaining": None,
                 "resets_monthly": False,
+                "storage": {
+                    "chunk_limit": None,
+                    "chunks_used": chunks_used,
+                    "chunks_remaining": None,
+                },
             }
 
         used, was_reset = get_usage_count(site, db)
@@ -35,6 +44,11 @@ def get_usage(site: Site = Depends(get_site)):
             "used": used,
             "remaining": max(0, site.message_limit - used),
             "resets_monthly": config["resets_monthly"],
+            "storage": {
+                "chunk_limit": chunk_limit,
+                "chunks_used": chunks_used,
+                "chunks_remaining": max(0, chunk_limit - chunks_used),
+            },
         }
     finally:
         db.close()
