@@ -27,8 +27,8 @@ app = FastAPI(
     openapi_tags=[
         {"name": "status",    "description": "Health check"},
         {"name": "chat",      "description": "Ask questions against your ingested documents"},
-        {"name": "ingest",    "description": "Upload and manage documents"},
-        {"name": "usage",     "description": "Query message quota and usage"},
+        {"name": "ingest",    "description": "Upload and manage documents. Enforces per-plan storage limits (free: 250 chunks, pro: 10 000 chunks, enterprise: unlimited)."},
+        {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
         {"name": "admin",     "description": "Admin-only site management"},
     ],
 )
