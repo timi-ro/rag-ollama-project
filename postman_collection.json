@@ -1,13 +1,15 @@
 {
   "info": {
     "name": "RAG API",
+    "description": "Multi-tenant RAG API. Set the collection variables (base_url, api_key, admin_secret) before running requests.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8000" },
-    { "key": "api_key", "value": "your-site-api-key-here" },
-    { "key": "admin_secret", "value": "change-me-in-production" },
-    { "key": "site_id", "value": "1" }
+    { "key": "base_url",      "value": "http://localhost:8000" },
+    { "key": "api_key",       "value": "your-site-api-key-here" },
+    { "key": "admin_secret",  "value": "your-admin-secret-here" },
+    { "key": "site_id",       "value": "1" },
+    { "key": "doc_id",        "value": "page-123" }
   ],
   "item": [
     {
@@ -17,7 +19,8 @@
           "name": "Health Check",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/status"
+            "url": "{{base_url}}/status",
+            "description": "Returns server status, API version, and the active Ollama model name."
           }
         }
       ]
@@ -30,13 +33,14 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/admin/sites",
+            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Content-Type",   "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\",\n  \"message_limit\": 100\n}"
+              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\"\n}"
             }
           }
         },
@@ -45,6 +49,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/admin/sites",
+            "description": "Returns all sites with their plan, status, and total request count.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
             ]
@@ -55,6 +60,7 @@
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/admin/sites/{{site_id}}/deactivate",
+            "description": "Deactivates a site. Its API key will be rejected on all subsequent requests.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
             ]
@@ -65,9 +71,10 @@
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/admin/sites/{{site_id}}/plan",
+            "description": "Changes a site's plan. Message limit and storage chunk limit are updated automatically. Valid plans: free, pro, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Content-Type",   "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -85,8 +92,9 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/ingest/text",
+            "description": "Ingests raw text content for the authenticated site. Returns 413 STORAGE_LIMIT_REACHED if the site has exhausted its chunk quota. doc_id must match ^[\\w.\\-]+$.",
             "header": [
-              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "X-API-Key",    "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
@@ -100,6 +108,7 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/ingest/file",
+            "description": "Uploads a file (.pdf, .txt, .md) for ingestion. Max size is MAX_UPLOAD_BYTES (default 10 MB). Returns 413 if the file is too large or the storage quota is exceeded.",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ],
@@ -116,6 +125,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/ingest/documents",
+            "description": "Lists all ingested documents for the authenticated site, with chunk counts.",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ]
@@ -125,7 +135,8 @@
           "name": "Delete Document",
           "request": {
             "method": "DELETE",
-            "url": "{{base_url}}/ingest/page-123",
+            "url": "{{base_url}}/ingest/{{doc_id}}",
+            "description": "Deletes all chunks for a document. This frees up storage toward the plan quota.",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ]
@@ -141,6 +152,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/usage",
+            "description": "Returns message quota and storage quota for the authenticated site. The 'storage' key contains chunk_limit, chunks_used, and chunks_remaining. Enterprise plan returns null for all limits.",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ]
@@ -156,8 +168,9 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/chat",
+            "description": "Ask a question against the site's knowledge base. Returns an answer and the source doc_ids used as context.",
             "header": [
-              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "X-API-Key",    "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
@@ -171,13 +184,14 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/chat",
+            "description": "Chat with conversation history. Each message must have role ('user' or 'assistant') and content (max 4096 chars). Max 20 turns.",
             "header": [
-              { "key": "X-API-Key", "value": "{{api_key}}" },
+              { "key": "X-API-Key",    "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"question\": \"Can you elaborate on that?\",\n  \"conversation_history\": [\n    { \"role\": \"user\", \"content\": \"What services do you offer?\" },\n    { \"role\": \"assistant\", \"content\": \"We offer consulting and development services.\" }\n  ]\n}"
+              "raw": "{\n  \"question\": \"Can you elaborate on that?\",\n  \"conversation_history\": [\n    { \"role\": \"user\",      \"content\": \"What services do you offer?\" },\n    { \"role\": \"assistant\", \"content\": \"We offer consulting and development services.\" }\n  ]\n}"
             }
           }
         }

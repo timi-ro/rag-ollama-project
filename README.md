@@ -155,13 +155,13 @@ API keys are shown **only once** when a site is created and are not stored in pl
 
 ### Plans
 
-| Plan | Message limit | Resets |
-|------|--------------|--------|
-| `free` | 20 (all-time) | Never |
-| `pro` | 2000 | Every 30 days (rolling) |
-| `enterprise` | Unlimited | — |
+| Plan | Message limit | Resets | Storage (chunks) | Approx. storage |
+|------|--------------|--------|-----------------|----------------|
+| `free` | 20 (all-time) | Never | 250 | ~3 MB |
+| `pro` | 2000 | Every 30 days (rolling) | 10,000 | ~130 MB |
+| `enterprise` | Unlimited | — | Unlimited | — |
 
-Only successful `/chat` requests (HTTP 200) count toward the quota.
+Only successful `/chat` requests (HTTP 200) count toward the message quota. Storage usage and remaining capacity are returned by the `/usage` endpoint under the `storage` key.
 
 ### Rate limiting
 
@@ -175,6 +175,7 @@ Only successful `/chat` requests (HTTP 200) count toward the quota.
 | `401` | `{"error": "INVALID_ADMIN_SECRET"}` | Missing or wrong `X-Admin-Secret` |
 | `429` | `{"error": "RATE_LIMIT_EXCEEDED"}` | Rate limit hit |
 | `429` | `{"error": "PLAN_LIMIT_REACHED", "plan": "...", "used": N, "limit": N}` | Message quota exhausted |
+| `413` | `{"error": "STORAGE_LIMIT_REACHED", "chunk_limit": N, "chunks_used": N, "chunks_available": N}` | Storage quota exhausted |
 
 ## ⚙️ Environment Variables
 
