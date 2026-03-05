@@ -155,11 +155,12 @@ API keys are shown **only once** when a site is created and are not stored in pl
 
 ### Plans
 
-| Plan | Message limit | Resets | Storage (chunks) | Approx. storage |
-|------|--------------|--------|-----------------|----------------|
-| `free` | 20 (all-time) | Never | 250 | ~3 MB |
-| `pro` | 2000 | Every 30 days (rolling) | 10,000 | ~130 MB |
-| `enterprise` | Unlimited | — | Unlimited | — |
+| Plan | Message limit | Resets | Storage (chunks) | Approx. storage | LLM |
+|------|--------------|--------|-----------------|----------------|-----|
+| `free` | 20 (all-time) | Never | 250 | ~3 MB | Ollama |
+| `pro` | 2,000 | Every 30 days (rolling) | 10,000 | ~130 MB | Ollama |
+| `gold` | 5,000 | Every 30 days (rolling) | 50,000 | ~650 MB | External (OpenAI / Gemini / Anthropic) |
+| `enterprise` | Unlimited | — | Unlimited | — | Ollama |
 
 Only successful `/chat` requests (HTTP 200) count toward the message quota. Storage usage and remaining capacity are returned by the `/usage` endpoint under the `storage` key.
 
@@ -182,7 +183,12 @@ Only successful `/chat` requests (HTTP 200) count toward the message quota. Stor
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `llama3.2` | Default model |
+| `OLLAMA_MODEL` | `llama3.2` | Model used for all Ollama-powered plans (free, pro, enterprise) |
+| `EXTERNAL_LLM_PROVIDER` | *(none)* | LLM provider for the gold plan: `openai`, `gemini`, or `anthropic`. Server refuses to start if set to an unsupported value or if the matching API key is missing. |
+| `EXTERNAL_LLM_MODEL` | *(provider default)* | Override the model for the external provider. Defaults: `gpt-4o-mini` (OpenAI), `gemini-2.0-flash` (Gemini), `claude-3-5-haiku-20241022` (Anthropic). |
+| `OPENAI_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=openai` |
+| `GOOGLE_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=gemini` |
+| `ANTHROPIC_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=anthropic` |
 | `CHROMA_DB_PATH` | `./chroma_db` | Vector store path |
 | `SQLITE_DB_PATH` | `./sites.db` | SQLite database path |
 | `ADMIN_SECRET` | **required** | Secret for admin endpoints. The server refuses to start if unset or set to the placeholder value. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |

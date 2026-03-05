@@ -33,7 +33,7 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/admin/sites",
-            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan.",
+            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan. Valid plans: free, pro, gold, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
@@ -71,7 +71,7 @@
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/admin/sites/{{site_id}}/plan",
-            "description": "Changes a site's plan. Message limit and storage chunk limit are updated automatically. Valid plans: free, pro, enterprise.",
+            "description": "Changes a site's plan. Message limit and storage chunk limit are updated automatically. Valid plans: free, pro, gold, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }

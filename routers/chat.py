@@ -56,7 +56,7 @@ def chat(req: ChatRequest, site: Site = Depends(get_site)):
         }) if results.get("metadatas") else []
 
         # Generate answer
-        answer = generate_answer(get_llm(), req.question, context, req.conversation_history)
+        answer = generate_answer(get_llm(site.plan), req.question, context, req.conversation_history)
 
         # Log successful request
         db.add(RequestLog(site_id=site.id, endpoint="/chat", status_code=200))

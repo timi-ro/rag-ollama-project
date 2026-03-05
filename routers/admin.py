@@ -32,7 +32,7 @@ def create_site(req: CreateSiteRequest, _=Depends(get_admin)):
 
     raw_key = secrets.token_urlsafe(32)
     key_hash = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
-    period_start = datetime.datetime.now(timezone.utc) if req.plan == "pro" else None
+    period_start = datetime.datetime.now(timezone.utc) if config["resets_monthly"] else None
 
     db = SessionLocal()
     try:
@@ -110,7 +110,7 @@ def update_plan(site_id: int, req: UpdatePlanRequest, _=Depends(get_admin)):
             raise HTTPException(status_code=404, detail="Site not found")
         site.plan = req.plan
         site.message_limit = config["limit"]
-        site.period_start = datetime.datetime.now(timezone.utc) if req.plan == "pro" else None
+        site.period_start = datetime.datetime.now(timezone.utc) if config["resets_monthly"] else None
         db.commit()
         return {"site_id": site_id, "plan": site.plan, "message_limit": config["limit"]}
     finally:

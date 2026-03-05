@@ -6,9 +6,10 @@ from sqlalchemy import func
 from models.database import RequestLog
 
 PLAN_CONFIG = {
-    "free":       {"limit": 20,   "resets_monthly": False, "unlimited": False, "chunk_limit": 250},
-    "pro":        {"limit": 2000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 10_000},
-    "enterprise": {"limit": None, "resets_monthly": False, "unlimited": True,  "chunk_limit": None},
+    "free":       {"limit": 20,   "resets_monthly": False, "unlimited": False, "chunk_limit": 250,    "llm": "ollama"},
+    "pro":        {"limit": 2000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 10_000, "llm": "ollama"},
+    "gold":       {"limit": 5000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 50_000, "llm": "external"},
+    "enterprise": {"limit": None, "resets_monthly": False, "unlimited": True,  "chunk_limit": None,   "llm": "ollama"},
 }
 
 
@@ -19,13 +20,13 @@ def get_plan_config(plan: str) -> dict:
 
 
 def get_usage_count(site, db) -> tuple:
-    """Return (used, was_reset). Mutates site.period_start for pro resets."""
+    """Return (used, was_reset). Mutates site.period_start for monthly-reset plans."""
     config = get_plan_config(site.plan)
 
     if config["unlimited"]:
         return (0, False)
 
-    if site.plan == "pro":
+    if config["resets_monthly"]:
         now = datetime.datetime.now(timezone.utc)
         was_reset = False
         if site.period_start is None or (now - site.period_start).days >= 30:

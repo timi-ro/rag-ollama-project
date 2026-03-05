@@ -27,7 +27,7 @@ app = FastAPI(
     openapi_tags=[
         {"name": "status",    "description": "Health check"},
         {"name": "chat",      "description": "Ask questions against your ingested documents"},
-        {"name": "ingest",    "description": "Upload and manage documents. Enforces per-plan storage limits (free: 250 chunks, pro: 10 000 chunks, enterprise: unlimited)."},
+        {"name": "ingest",    "description": "Upload and manage documents. Enforces per-plan storage limits (free: 250 chunks, pro: 10 000 chunks, gold: 50 000 chunks, enterprise: unlimited)."},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
         {"name": "admin",     "description": "Admin-only site management"},
     ],
@@ -54,6 +54,19 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 _INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
 
+
+def _validate_provider_config():
+    provider = os.getenv("EXTERNAL_LLM_PROVIDER", "")
+    if not provider:
+        return  # not configured — gold plan will error at request time with a clear message
+    valid = {"openai", "gemini", "anthropic"}
+    if provider not in valid:
+        raise RuntimeError(f"EXTERNAL_LLM_PROVIDER={provider!r} is invalid. Valid: {valid}")
+    key_vars = {"openai": "OPENAI_API_KEY", "gemini": "GOOGLE_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+    if not os.getenv(key_vars[provider]):
+        raise RuntimeError(f"EXTERNAL_LLM_PROVIDER={provider!r} requires {key_vars[provider]} to be set.")
+
+
 @app.on_event("startup")
 def startup():
     secret = os.getenv("ADMIN_SECRET", "")
@@ -62,6 +75,7 @@ def startup():
             "ADMIN_SECRET env var is not set or is still the default placeholder. "
             "Set a strong secret before starting the server."
         )
+    _validate_provider_config()
     init_db()
 
 
