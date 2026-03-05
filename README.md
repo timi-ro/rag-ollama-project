@@ -1,11 +1,11 @@
 # 🤖 Local RAG System with Ollama & LangChain
 
-A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** — completely local, no API keys required.
+A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** — local by default, with optional cloud LLM support for the gold plan.
 
 ## ✨ Features
 
-- 🆓 **100% Free** - No API keys, no payment methods
-- 🏠 **Runs Locally** - Complete privacy, works offline
+- 🆓 **Free & Local by Default** - Free/pro/enterprise plans run entirely on Ollama, no external API keys needed
+- 🏠 **Runs Locally** - Complete privacy and offline operation for Ollama-powered plans; gold plan routes to a cloud LLM of your choice
 - ⚡ **Fast Responses** - Optimised retrieval pipeline with ChromaDB
 - 📎 **Source Citations** - Every answer shows which documents it came from
 - 🧠 **Conversation History** - Follow-up questions with context awareness
@@ -15,7 +15,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 🏢 **Multi-Tenant** - Each client gets isolated documents and vector store
 - 📤 **Document Ingestion API** - Ingest text or files per tenant
 - 🔑 **API Key Auth** - Per-site access control with hashed keys
-- 📊 **Plan & Usage Limits** - Per-site message limits with free/pro plans
+- 📊 **Plan & Usage Limits** - Per-site message limits with free/pro/gold/enterprise plans
 - 🚦 **Rate Limiting** - 60 requests/minute per API key
 - 🐳 **Docker Support** - Full stack with one command
 
@@ -60,7 +60,7 @@ rag-ollama-project/
 ├── services/
 │   ├── embedding.py         # Ollama embeddings
 │   ├── vectorstore.py       # ChromaDB operations
-│   └── llm.py               # Ollama LLM
+│   └── llm.py               # LLM routing (Ollama + external providers)
 ├── models/
 │   └── database.py          # SQLAlchemy models (sites, request_logs)
 ├── middleware/
@@ -163,6 +163,21 @@ API keys are shown **only once** when a site is created and are not stored in pl
 | `enterprise` | Unlimited | — | Unlimited | — | Ollama |
 
 Only successful `/chat` requests (HTTP 200) count toward the message quota. Storage usage and remaining capacity are returned by the `/usage` endpoint under the `storage` key.
+
+The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be set before the server starts. Free, pro, and enterprise plans need no external keys.
+
+### /status response
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "ollama": { "model": "llama3.2" },
+  "external_llm": { "provider": "openai", "model": "gpt-4o-mini" }
+}
+```
+
+`external_llm.provider` is `null` when `EXTERNAL_LLM_PROVIDER` is not configured.
 
 ### Rate limiting
 

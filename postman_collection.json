@@ -20,7 +20,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/status",
-            "description": "Returns server status, API version, and the active Ollama model name."
+            "description": "Returns server status, API version, the active Ollama model, and external LLM provider info. The 'external_llm.provider' field is null when EXTERNAL_LLM_PROVIDER is not configured."
           }
         }
       ]
@@ -40,7 +40,8 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\"\n}"
+              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\"\n}",
+              "_comment": "Valid plans: free, pro, gold, enterprise. Gold routes chat to the external LLM provider configured via EXTERNAL_LLM_PROVIDER."
             }
           }
         },
@@ -78,7 +79,8 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"pro\"\n}"
+              "raw": "{\n  \"plan\": \"pro\"\n}",
+              "_comment": "Valid plans: free, pro, gold, enterprise."
             }
           }
         }

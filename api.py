@@ -21,15 +21,18 @@ app = FastAPI(
     title="RAG API",
     version="1.0.0",
     description=(
-        "A multi-tenant Retrieval-Augmented Generation API built with LangChain and Ollama. "
+        "A multi-tenant Retrieval-Augmented Generation API built with LangChain. "
+        "Free, pro, and enterprise plans use Ollama for local inference. "
+        "The gold plan routes chat requests to an external LLM provider (OpenAI, Gemini, or Anthropic) "
+        "configured via EXTERNAL_LLM_PROVIDER. "
         "Each site gets isolated document storage, API key authentication, and plan-based usage limits."
     ),
     openapi_tags=[
-        {"name": "status",    "description": "Health check"},
-        {"name": "chat",      "description": "Ask questions against your ingested documents"},
+        {"name": "status",    "description": "Health check. Returns server version, active Ollama model, and external LLM provider info."},
+        {"name": "chat",      "description": "Ask questions against your ingested documents. Gold plan sites are routed to the configured external LLM provider."},
         {"name": "ingest",    "description": "Upload and manage documents. Enforces per-plan storage limits (free: 250 chunks, pro: 10 000 chunks, gold: 50 000 chunks, enterprise: unlimited)."},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
-        {"name": "admin",     "description": "Admin-only site management"},
+        {"name": "admin",     "description": "Admin-only site management. Valid plans: free, pro, gold, enterprise."},
     ],
 )
 
