@@ -29,7 +29,11 @@ def get_usage_count(site, db) -> tuple:
     if config["resets_monthly"]:
         now = datetime.datetime.now(timezone.utc)
         was_reset = False
-        if site.period_start is None or (now - site.period_start).days >= 30:
+        # SQLite returns naive datetimes; coerce to UTC before arithmetic
+        period_start = site.period_start
+        if period_start is not None and period_start.tzinfo is None:
+            period_start = period_start.replace(tzinfo=timezone.utc)
+        if period_start is None or (now - period_start).days >= 30:
             site.period_start = now
             was_reset = True
         used = db.query(func.count(RequestLog.id)).filter(
