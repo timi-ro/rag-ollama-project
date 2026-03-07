@@ -74,6 +74,9 @@ rag-ollama-project/
 
 ## 🚀 Quick Start
 
+<details>
+<summary>Click to expand</summary>
+
 ### Option A — Docker (Recommended)
 
 **Prerequisites:** [Docker](https://docs.docker.com/get-docker/) + Docker Compose
@@ -128,8 +131,12 @@ streamlit run app.py
 # CLI
 python main.py
 ```
+</details>
 
 ## 🔧 API Reference
+
+<details>
+<summary>Click to expand</summary>
 
 Interactive docs with all endpoints, request/response schemas, and a built-in try-it-out tool are available at:
 
@@ -193,7 +200,12 @@ The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be 
 | `429` | `{"error": "PLAN_LIMIT_REACHED", "plan": "...", "used": N, "limit": N}` | Message quota exhausted |
 | `413` | `{"error": "STORAGE_LIMIT_REACHED", "chunk_limit": N, "chunks_used": N, "chunks_available": N}` | Storage quota exhausted |
 
+</details>
+
 ## ⚙️ Environment Variables
+
+<details>
+<summary>Click to expand</summary>
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -210,7 +222,12 @@ The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be 
 | `ALLOWED_ORIGINS` | *(none)* | Comma-separated list of allowed CORS origins, e.g. `https://app.example.com`. Leave empty to block all cross-origin requests. |
 | `MAX_UPLOAD_BYTES` | `10485760` | Maximum file/text upload size in bytes (default 10 MB) |
 
+</details>
+
 ## 🐛 Troubleshooting
+
+<details>
+<summary>Click to expand</summary>
 
 ### Ollama not running
 ```bash
@@ -244,13 +261,11 @@ OLLAMA_BASE_URL: http://host.docker.internal:11434
 
 And remove the `ollama` service from `docker-compose.yml`. Ollama running natively uses Metal GPU acceleration and is dramatically faster.
 
-## 📝 License
+</details>
 
-MIT License
+## 👩🏼‍💻Author
 
-## 👤 Author
-
-**Fatima**
+**Fatima R.**
 - Backend Developer | AI Enthusiast
 - LinkedIn: [linkedin.com/in/frostami](https://www.linkedin.com/in/frostami/)
 
