@@ -9,7 +9,8 @@
     { "key": "api_key",       "value": "your-site-api-key-here" },
     { "key": "admin_secret",  "value": "your-admin-secret-here" },
     { "key": "site_id",       "value": "1" },
-    { "key": "doc_id",        "value": "page-123" }
+    { "key": "doc_id",        "value": "page-123" },
+    { "key": "job_id",        "value": "" }
   ],
   "item": [
     {
@@ -110,7 +111,7 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/ingest/file",
-            "description": "Uploads a file (.pdf, .txt, .md) for ingestion. Max size is MAX_UPLOAD_BYTES (default 10 MB). Returns 413 if the file is too large or the storage quota is exceeded.",
+            "description": "Upload a file (.pdf, .txt, .md) for async ingestion. Returns 202 immediately with a job_id — the file is queued and processed in the background. Copy the returned job_id into the {{job_id}} collection variable, then use 'Poll Upload Status' to track progress. Max file size is 10 MB (MAX_UPLOAD_BYTES). Returns 413 if the file is too large or the storage quota would be exceeded.",
             "header": [
               { "key": "X-API-Key", "value": "{{api_key}}" }
             ],
@@ -120,6 +121,28 @@
                 { "key": "file", "type": "file", "src": "" }
               ]
             }
+          }
+        },
+        {
+          "name": "Poll Upload Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/ingest/status/{{job_id}}",
+            "description": "Check the status of a queued file upload. Set {{job_id}} to the value returned by 'Ingest File'.\n\nPossible status values:\n- queued: waiting in queue. queue_position and eta_seconds are set.\n- processing: currently being embedded and stored.\n- done: ingestion complete. See the result field for chunk count and doc_id.\n- failed: something went wrong. See the error field. Use 'Retry Failed Upload' to try again without re-uploading.",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
+          }
+        },
+        {
+          "name": "Retry Failed Upload",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/ingest/retry/{{job_id}}",
+            "description": "Re-queue a failed upload job. The original file is reused — no need to upload again. Returns 202 with the new queue position and eta_seconds. Returns 404 if the job does not exist or is not in a failed state.",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
           }
         },
         {
