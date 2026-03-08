@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from fastapi import FastAPI, Request
@@ -9,6 +10,8 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from models.database import init_db
 from routers import status, ingest, chat, admin, usage
+from routers.ingest import process_upload_job
+from services import job_queue
 
 
 def get_api_key(request: Request) -> str:
@@ -30,7 +33,14 @@ app = FastAPI(
     openapi_tags=[
         {"name": "status",    "description": "Health check. Returns server version, active Ollama model, and external LLM provider info."},
         {"name": "chat",      "description": "Ask questions against your ingested documents. Gold plan sites are routed to the configured external LLM provider."},
-        {"name": "ingest",    "description": "Upload and manage documents. Enforces per-plan storage limits (free: 250 chunks, pro: 10 000 chunks, gold: 50 000 chunks, enterprise: unlimited)."},
+        {"name": "ingest",    "description": (
+            "Upload and manage documents. Enforces per-plan storage limits "
+            "(free: 250 chunks, pro: 10 000 chunks, gold: 50 000 chunks, enterprise: unlimited). "
+            "File uploads (POST /ingest/file) are processed asynchronously: the endpoint returns 202 immediately "
+            "with a job_id. Poll GET /ingest/status/{job_id} for progress, queue position, and ETA. "
+            "Failed jobs can be retried via POST /ingest/retry/{job_id} without re-uploading the file. "
+            "Text ingestion (POST /ingest/text) is synchronous."
+        )},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
         {"name": "admin",     "description": "Admin-only site management. Valid plans: free, pro, gold, enterprise."},
     ],
@@ -71,7 +81,7 @@ def _validate_provider_config():
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
     secret = os.getenv("ADMIN_SECRET", "")
     if secret in _INSECURE_SECRET_DEFAULTS:
         raise RuntimeError(
@@ -80,6 +90,7 @@ def startup():
         )
     _validate_provider_config()
     init_db()
+    asyncio.create_task(job_queue.run_worker(process_upload_job))
 
 
 app.include_router(status.router)

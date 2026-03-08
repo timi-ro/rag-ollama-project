@@ -54,12 +54,14 @@ rag-ollama-project/
 ├── app.py                   # Streamlit web interface
 ├── routers/
 │   ├── status.py            # GET /status
-│   ├── ingest.py            # POST /ingest/text, /ingest/file, GET /ingest/documents, DELETE /ingest/{doc_id}
+│   ├── ingest.py            # File & text ingestion endpoints + async job queue
 │   ├── chat.py              # POST /chat
 │   └── admin.py             # Admin site management
 ├── services/
-│   ├── embedding.py         # Ollama embeddings
+│   ├── embedding.py         # Ollama embeddings (singleton + batched)
 │   ├── vectorstore.py       # ChromaDB operations
+│   ├── concurrency.py       # Shared semaphores (embed + upload)
+│   ├── job_queue.py         # Async upload job queue, status tracking, ETA, retry
 │   └── llm.py               # LLM routing (Ollama + external providers)
 ├── models/
 │   └── database.py          # SQLAlchemy models (sites, request_logs)
@@ -173,6 +175,69 @@ Only successful `/chat` requests (HTTP 200) count toward the message quota. Stor
 
 The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be set before the server starts. Free, pro, and enterprise plans need no external keys.
 
+### File upload — async job queue
+
+File uploads (`POST /ingest/file`) are processed asynchronously. The endpoint returns `202 Accepted` immediately so clients are never left waiting during long embedding jobs.
+
+**1. Upload a file**
+```http
+POST /ingest/file
+X-API-Key: <key>
+Content-Type: multipart/form-data
+
+file=@report.pdf
+```
+```json
+{
+  "job_id": "j_a3f9b2c1d4e5",
+  "status": "queued",
+  "filename": "report.pdf",
+  "queue_position": 3,
+  "eta_seconds": 90,
+  "poll_url": "/ingest/status/j_a3f9b2c1d4e5"
+}
+```
+
+**2. Poll for status**
+```http
+GET /ingest/status/j_a3f9b2c1d4e5
+X-API-Key: <key>
+```
+```json
+{
+  "job_id": "j_a3f9b2c1d4e5",
+  "status": "done",
+  "filename": "report.pdf",
+  "queue_position": 0,
+  "eta_seconds": null,
+  "created_at": 1741435200.0,
+  "started_at": 1741435210.0,
+  "completed_at": 1741435245.0,
+  "result": { "ingested": 42, "doc_id": "report.pdf" },
+  "error": null
+}
+```
+
+**Job status values:**
+
+| Status | Meaning |
+|--------|---------|
+| `queued` | Waiting in queue — `queue_position` and `eta_seconds` are set |
+| `processing` | Currently being embedded and stored |
+| `done` | Successfully ingested — see `result` |
+| `failed` | Something went wrong — see `error`. The job can be retried. |
+
+**3. Retry a failed job** (no need to re-upload the file)
+```http
+POST /ingest/retry/j_a3f9b2c1d4e5
+X-API-Key: <key>
+```
+Returns the same 202 shape as the original upload with the new queue position and ETA.
+
+`eta_seconds` is estimated from a rolling average of the last 20 completed jobs multiplied by `queue_position`. It is `null` until at least one job has completed.
+
+---
+
 ### /status response
 
 ```json
@@ -221,6 +286,8 @@ The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be 
 | `ADMIN_SECRET` | **required** | Secret for admin endpoints. The server refuses to start if unset or set to the placeholder value. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `ALLOWED_ORIGINS` | *(none)* | Comma-separated list of allowed CORS origins, e.g. `https://app.example.com`. Leave empty to block all cross-origin requests. |
 | `MAX_UPLOAD_BYTES` | `10485760` | Maximum file/text upload size in bytes (default 10 MB) |
+| `EMBED_BATCH_SIZE` | `16` | Number of text chunks sent to Ollama per embedding call. Lower values reduce CPU spike; higher values increase throughput. |
+| `MAX_INFLIGHT_UPLOADS` | `10` | Maximum number of upload requests actively streaming to disk at the same time. Excess requests queue in memory with negligible overhead. |
 
 </details>
 
