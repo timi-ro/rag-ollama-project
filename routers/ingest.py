@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import re
 import tempfile
@@ -98,6 +99,12 @@ async def process_upload_job(job: UploadJob) -> dict:
 # Helper: build the status payload for a job
 # ---------------------------------------------------------------------------
 
+def _iso(ts: float | None) -> str | None:
+    if ts is None:
+        return None
+    return datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _job_response(job: UploadJob) -> dict:
     pos = job_queue.queue_position(job.job_id)
     eta = job_queue.eta_seconds(pos)
@@ -107,9 +114,9 @@ def _job_response(job: UploadJob) -> dict:
         "filename": job.filename,
         "queue_position": pos,
         "eta_seconds": eta,
-        "created_at": job.created_at,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
+        "created_at": _iso(job.created_at),
+        "started_at": _iso(job.started_at),
+        "completed_at": _iso(job.completed_at),
         "result": job.result,
         "error": job.error,
         "poll_url": f"/ingest/status/{job.job_id}",
