@@ -88,3 +88,12 @@ def delete_doc_chunks(site_id: int, doc_id: str):
         collection.delete(where={"$and": [{"site_id": str(site_id)}, {"doc_id": doc_id}]})
     except Exception:
         pass
+
+
+def delete_site_chunks(site_id: int):
+    """Delete all chunks for a site (all documents)."""
+    collection = _get_collection()
+    try:
+        collection.delete(where={"site_id": str(site_id)})
+    except Exception:
+        pass

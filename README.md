@@ -238,6 +238,52 @@ Returns the same 202 shape as the original upload with the new queue position an
 
 ---
 
+### Admin endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/admin/sites` | Create site, returns API key once |
+| `GET` | `/admin/sites` | List all sites |
+| `PATCH` | `/admin/sites/{id}` | Update plan and/or active status |
+| `POST` | `/admin/sites/{id}/reset` | Clear message logs and/or all documents |
+| `POST` | `/admin/sites/{id}/regenerate-key` | Issue a new API key, invalidates the old one |
+
+**Update site** — all fields optional, send only what you want to change:
+```http
+PATCH /admin/sites/{id}
+X-Admin-Secret: <secret>
+
+{ "plan": "pro", "is_active": true }
+```
+
+**Reset usage** — both flags default to `false`, opt in explicitly:
+```http
+POST /admin/sites/{id}/reset
+X-Admin-Secret: <secret>
+
+{ "messages": true, "files": true }
+```
+```json
+{ "site_id": 3, "cleared": ["messages", "files"] }
+```
+
+| Flag | What gets deleted |
+|------|-------------------|
+| `messages` | All request logs → message quota resets to zero |
+| `files` | All vector chunks → storage quota resets to zero |
+
+**Regenerate API key:**
+```http
+POST /admin/sites/{id}/regenerate-key
+X-Admin-Secret: <secret>
+```
+```json
+{ "site_id": 3, "api_key": "new-key-shown-once" }
+```
+The previous key stops working immediately. Save the new key — it cannot be retrieved again.
+
+---
+
 ### /status response
 
 ```json

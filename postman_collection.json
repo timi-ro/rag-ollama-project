@@ -58,31 +58,46 @@
           }
         },
         {
-          "name": "Deactivate Site",
+          "name": "Update Site",
           "request": {
             "method": "PATCH",
-            "url": "{{base_url}}/admin/sites/{{site_id}}/deactivate",
-            "description": "Deactivates a site. Its API key will be rejected on all subsequent requests.",
-            "header": [
-              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
-            ]
-          }
-        },
-        {
-          "name": "Update Plan",
-          "request": {
-            "method": "PATCH",
-            "url": "{{base_url}}/admin/sites/{{site_id}}/plan",
-            "description": "Changes a site's plan. Message limit and storage chunk limit are updated automatically. Valid plans: free, pro, gold, enterprise.",
+            "url": "{{base_url}}/admin/sites/{{site_id}}",
+            "description": "Update any combination of plan and/or is_active for a site. All fields are optional — send only what you want to change.\n\nExamples:\n- Change plan: {\"plan\": \"pro\"}\n- Deactivate: {\"is_active\": false}\n- Reactivate: {\"is_active\": true}\n- Both at once: {\"plan\": \"gold\", \"is_active\": true}\n\nValid plans: free, pro, gold, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"pro\"\n}",
-              "_comment": "Valid plans: free, pro, gold, enterprise."
+              "raw": "{\n  \"plan\": \"pro\",\n  \"is_active\": true\n}"
             }
+          }
+        },
+        {
+          "name": "Reset Site Usage",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/admin/sites/{{site_id}}/reset",
+            "description": "Clear usage data for a site. Both fields default to false — you must opt in explicitly to prevent accidental data loss.\n\n- messages: deletes all request logs and resets the message quota to zero.\n- files: deletes all ingested documents and vector chunks from the store.\n\nYou can reset one or both at the same time.",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": true,\n  \"files\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Regenerate API Key",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/admin/sites/{{site_id}}/regenerate-key",
+            "description": "Issues a new API key for the site. The previous key is immediately invalidated. The new key is returned once and cannot be retrieved again — save it immediately.",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" }
+            ]
           }
         }
       ]

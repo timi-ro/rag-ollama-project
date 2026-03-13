@@ -42,7 +42,12 @@ app = FastAPI(
             "Text ingestion (POST /ingest/text) is synchronous."
         )},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
-        {"name": "admin",     "description": "Admin-only site management. Valid plans: free, pro, gold, enterprise."},
+        {"name": "admin",     "description": (
+            "Admin-only site management. Valid plans: free, pro, gold, enterprise. "
+            "PATCH /admin/sites/{id} updates plan and/or is_active in one call. "
+            "POST /admin/sites/{id}/reset clears message logs (messages: true) and/or all vector chunks (files: true) — both fields default to false. "
+            "POST /admin/sites/{id}/regenerate-key issues a new API key; the previous key is immediately invalidated and the new one is shown once."
+        )},
     ],
 )
 
