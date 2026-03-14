@@ -4,7 +4,7 @@ import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Literal, Callable, Awaitable
+from typing import Literal, Callable, Awaitable, Optional
 
 JobStatus = Literal["queued", "processing", "done", "failed"]
 
@@ -21,10 +21,10 @@ class UploadJob:
     filename: str
     status: JobStatus = "queued"
     created_at: float = field(default_factory=time.time)
-    started_at: float | None = None
-    completed_at: float | None = None
-    result: dict | None = None
-    error: str | None = None
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+    result: Optional[dict] = None
+    error: Optional[str] = None
 
 
 _jobs: dict[str, UploadJob] = {}
@@ -58,7 +58,7 @@ def queue_position(job_id: str) -> int:
         return 0
 
 
-def eta_seconds(position: int) -> int | None:
+def eta_seconds(position: int) -> Optional[int]:
     """Estimated seconds until the job starts processing, based on rolling average."""
     if not _recent_durations or position == 0:
         return None
@@ -83,7 +83,7 @@ def create_job(site_id: int, site_plan: str, tmp_path: str, ext: str, filename: 
     return job
 
 
-def get_job(job_id: str, site_id: int) -> UploadJob | None:
+def get_job(job_id: str, site_id: int) -> Optional[UploadJob]:
     """Return the job only if it belongs to the requesting site."""
     job = _jobs.get(job_id)
     if job is None or job.site_id != site_id:
@@ -91,7 +91,7 @@ def get_job(job_id: str, site_id: int) -> UploadJob | None:
     return job
 
 
-def requeue_job(job_id: str, site_id: int) -> UploadJob | None:
+def requeue_job(job_id: str, site_id: int) -> Optional[UploadJob]:
     """Re-queue a failed job for retry. Returns None if not found or not in failed state."""
     job = get_job(job_id, site_id)
     if job is None or job.status != "failed":

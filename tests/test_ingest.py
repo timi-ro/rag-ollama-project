@@ -4,9 +4,7 @@ from unittest.mock import MagicMock
 
 @pytest.fixture(autouse=True)
 def mock_ingest_services(mocker):
-    mock_emb = MagicMock()
-    mock_emb.embed_documents.side_effect = lambda chunks: [[0.1] * 10 for _ in chunks]
-    mocker.patch("routers.ingest.get_embeddings", return_value=mock_emb)
+    mocker.patch("routers.ingest.embed_in_batches", return_value=[[0.1] * 10])
     mocker.patch("routers.ingest.upsert_chunks")
     mocker.patch("routers.ingest.delete_doc_chunks")
     mocker.patch("routers.ingest.list_docs", return_value=[{"doc_id": "doc-1", "title": "Test Doc"}])
@@ -54,20 +52,44 @@ def test_ingest_file_too_large(client, free_site):
     assert response.status_code == 413
 
 
-def test_ingest_file_txt(client, free_site, mocker):
+def test_ingest_file_returns_202_with_job_id(client, free_site):
     site, raw_key = free_site
-    mock_doc = MagicMock()
-    mock_doc.page_content = "This is file content. " * 60
-    mock_loader = MagicMock()
-    mock_loader.load.return_value = [mock_doc]
-    mocker.patch("routers.ingest.TextLoader", return_value=mock_loader)
     response = client.post(
         "/ingest/file",
         files={"file": ("document.txt", b"This is file content. " * 60, "text/plain")},
         headers={"X-API-Key": raw_key},
     )
+    assert response.status_code == 202
+    data = response.json()
+    assert "job_id" in data
+    assert data["status"] == "queued"
+    assert "poll_url" in data
+
+
+def test_poll_status_unknown_job(client, free_site):
+    site, raw_key = free_site
+    response = client.get("/ingest/status/j_doesnotexist", headers={"X-API-Key": raw_key})
+    assert response.status_code == 404
+
+
+def test_poll_status_known_job(client, free_site):
+    site, raw_key = free_site
+    upload_resp = client.post(
+        "/ingest/file",
+        files={"file": ("document.txt", b"Hello world. " * 60, "text/plain")},
+        headers={"X-API-Key": raw_key},
+    )
+    job_id = upload_resp.json()["job_id"]
+    response = client.get(f"/ingest/status/{job_id}", headers={"X-API-Key": raw_key})
     assert response.status_code == 200
-    assert response.json()["ingested"] > 0
+    assert response.json()["job_id"] == job_id
+    assert response.json()["filename"] == "document.txt"
+
+
+def test_retry_unknown_job_returns_404(client, free_site):
+    site, raw_key = free_site
+    response = client.post("/ingest/retry/j_doesnotexist", headers={"X-API-Key": raw_key})
+    assert response.status_code == 404
 
 
 def test_list_documents(client, free_site):

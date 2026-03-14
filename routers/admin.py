@@ -6,6 +6,7 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
+from typing import Optional
 
 from middleware.auth import get_admin
 from models.database import SessionLocal, Site, RequestLog
@@ -21,8 +22,8 @@ class CreateSiteRequest(BaseModel):
 
 
 class UpdateSiteRequest(BaseModel):
-    plan: str | None = None
-    is_active: bool | None = None
+    plan: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 @router.post("/sites")

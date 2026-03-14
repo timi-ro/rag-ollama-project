@@ -8,7 +8,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 EMBED_BATCH_SIZE = int(os.getenv("EMBED_BATCH_SIZE", "16"))
 
-_embeddings_instance: OllamaEmbeddings | None = None
+_embeddings_instance = None
 
 
 def get_embeddings(model: str = None) -> OllamaEmbeddings:

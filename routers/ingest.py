@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
-from typing import Annotated
+from typing import Annotated, Optional
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -99,7 +99,7 @@ async def process_upload_job(job: UploadJob) -> dict:
 # Helper: build the status payload for a job
 # ---------------------------------------------------------------------------
 
-def _iso(ts: float | None) -> str | None:
+def _iso(ts) -> Optional[str]:
     if ts is None:
         return None
     return datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
