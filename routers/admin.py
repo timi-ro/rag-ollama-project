@@ -38,6 +38,8 @@ def create_site(req: CreateSiteRequest, _=Depends(get_admin)):
 
     db = SessionLocal()
     try:
+        if db.query(Site).filter(Site.name == req.name).first():
+            raise HTTPException(status_code=409, detail=f"A site named '{req.name}' already exists.")
         site = Site(
             name=req.name,
             api_key_prefix=raw_key[:8],

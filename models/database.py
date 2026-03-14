@@ -16,7 +16,7 @@ Base = declarative_base()
 class Site(Base):
     __tablename__ = "sites"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=False, unique=True)
     api_key_prefix = Column(String(8), nullable=True)
     api_key_hash = Column(String, unique=True, nullable=False)
     is_active = Column(Boolean, default=True)
