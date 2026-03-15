@@ -51,7 +51,7 @@ def get_llm(plan: str = "free"):
     raise RuntimeError(f"Unsupported EXTERNAL_LLM_PROVIDER: {provider!r}")
 
 
-def generate_answer(llm, question: str, context: str, conversation_history: list = None) -> str:
+def _build_messages(question: str, context: str, conversation_history: list = None) -> list:
     messages = [
         SystemMessage(content=(
             "You are a helpful assistant. Use the following context to answer the question.\n"
@@ -70,4 +70,15 @@ def generate_answer(llm, question: str, context: str, conversation_history: list
                 messages.append(AIMessage(content=content))
 
     messages.append(HumanMessage(content=question))
-    return llm.invoke(messages).content
+    return messages
+
+
+def generate_answer(llm, question: str, context: str, conversation_history: list = None) -> str:
+    return llm.invoke(_build_messages(question, context, conversation_history)).content
+
+
+async def generate_answer_stream(llm, question: str, context: str, conversation_history: list = None):
+    """Async generator yielding text tokens via LangChain astream."""
+    async for chunk in llm.astream(_build_messages(question, context, conversation_history)):
+        if hasattr(chunk, "content") and chunk.content:
+            yield chunk.content

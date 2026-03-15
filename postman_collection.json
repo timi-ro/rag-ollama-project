@@ -10,7 +10,8 @@
     { "key": "admin_secret",  "value": "your-admin-secret-here" },
     { "key": "site_id",       "value": "1" },
     { "key": "doc_id",        "value": "page-123" },
-    { "key": "job_id",        "value": "" }
+    { "key": "job_id",        "value": "" },
+    { "key": "chat_job_id",   "value": "" }
   ],
   "item": [
     {
@@ -21,7 +22,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/status",
-            "description": "Returns server status, API version, the active Ollama model, and external LLM provider info. The 'external_llm.provider' field is null when EXTERNAL_LLM_PROVIDER is not configured."
+            "description": "Returns server status, API version, and the active Ollama model."
           }
         }
       ]
@@ -34,15 +35,14 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/admin/sites",
-            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan. Valid plans: free, pro, gold, enterprise.",
+            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan. Valid plans: free, pro, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\"\n}",
-              "_comment": "Valid plans: free, pro, gold, enterprise. Gold routes chat to the external LLM provider configured via EXTERNAL_LLM_PROVIDER."
+              "raw": "{\n  \"name\": \"my-wordpress-site\",\n  \"plan\": \"free\"\n}"
             }
           }
         },
@@ -62,7 +62,7 @@
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/admin/sites/{{site_id}}",
-            "description": "Update any combination of plan and/or is_active for a site. All fields are optional — send only what you want to change.\n\nExamples:\n- Change plan: {\"plan\": \"pro\"}\n- Deactivate: {\"is_active\": false}\n- Reactivate: {\"is_active\": true}\n- Both at once: {\"plan\": \"gold\", \"is_active\": true}\n\nValid plans: free, pro, gold, enterprise.",
+            "description": "Update any combination of plan and/or is_active for a site. All fields are optional — send only what you want to change.\n\nExamples:\n- Change plan: {\"plan\": \"pro\"}\n- Deactivate: {\"is_active\": false}\n- Reactivate: {\"is_active\": true}\n- Both at once: {\"plan\": \"pro\", \"is_active\": true}\n\nValid plans: free, pro, enterprise.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
@@ -204,11 +204,11 @@
       "name": "Chat",
       "item": [
         {
-          "name": "Ask a Question",
+          "name": "Ask a Question (Sync)",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/chat",
-            "description": "Ask a question against the site's knowledge base. Returns an answer and the source doc_ids used as context.",
+            "description": "Ask a question against the site's knowledge base. Returns the full answer and source doc_ids in one response.\n\nIf the question was recently asked by the same site, the response is served from the in-memory cache instantly and includes 'from_cache: true'.\n\nResponse:\n{\n  \"answer\": \"...\",\n  \"sources\": [\"doc-id-1\"],\n  \"from_cache\": false\n}",
             "header": [
               { "key": "X-API-Key",    "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }
@@ -220,11 +220,64 @@
           }
         },
         {
+          "name": "Ask a Question (Streaming SSE)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/chat?stream=true",
+              "host": ["{{base_url}}"],
+              "path": ["chat"],
+              "query": [{ "key": "stream", "value": "true" }]
+            },
+            "description": "Stream the answer token-by-token using Server-Sent Events. The first token arrives in ~1 s. Best option for WP plugins — shows text progressively instead of waiting for the full response.\n\nEach line in the response stream is a JSON event prefixed with 'data: ':\n\n- Token chunk:  data: {\"token\": \"The \"}\n- Cache hit:    data: {\"answer\": \"...\", \"sources\": [...], \"done\": true, \"from_cache\": true}\n- Stream done:  data: {\"done\": true, \"sources\": [\"doc-1\"]}\n- Error:        data: {\"error\": \"PLAN_LIMIT_REACHED\", \"done\": true}\n\nNote: Postman shows the raw SSE stream in the response body. Use browser DevTools or a custom client to see tokens arrive in real time.",
+            "header": [
+              { "key": "X-API-Key",    "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What services do you offer?\",\n  \"conversation_history\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Ask a Question (Async)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/chat?async=true",
+              "host": ["{{base_url}}"],
+              "path": ["chat"],
+              "query": [{ "key": "async", "value": "true" }]
+            },
+            "description": "Queue a chat request and return immediately with a job_id. Useful for slow CPU environments where you don't want to hold the HTTP connection open.\n\nReturns 202:\n{\n  \"job_id\": \"cj_abc123\",\n  \"status\": \"queued\",\n  \"poll_url\": \"/chat/status/cj_abc123\"\n}\n\nCopy the job_id into {{chat_job_id}}, then use 'Poll Chat Status' to retrieve the result.",
+            "header": [
+              { "key": "X-API-Key",    "value": "{{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What services do you offer?\",\n  \"conversation_history\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Poll Chat Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/chat/status/{{chat_job_id}}",
+            "description": "Check the status of an async chat job. Set {{chat_job_id}} to the job_id returned by 'Ask a Question (Async)'.\n\nPossible status values:\n- queued: waiting to be processed.\n- processing: LLM is generating the answer.\n- done: answer is ready. See the result field: {answer, sources}.\n- failed: something went wrong. See the error field.\n\nCompleted jobs are kept for 1 hour, then purged.",
+            "header": [
+              { "key": "X-API-Key", "value": "{{api_key}}" }
+            ]
+          }
+        },
+        {
           "name": "Ask with History",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/chat",
-            "description": "Chat with conversation history. Each message must have role ('user' or 'assistant') and content (max 4096 chars). Max 20 turns.",
+            "description": "Chat with conversation history. Each message must have role ('user' or 'assistant') and content (max 4096 chars). Max 20 turns. Works with all three modes (?stream=true, ?async=true, or default sync).",
             "header": [
               { "key": "X-API-Key",    "value": "{{api_key}}" },
               { "key": "Content-Type", "value": "application/json" }

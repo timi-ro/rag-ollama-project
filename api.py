@@ -11,7 +11,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from models.database import init_db
 from routers import status, ingest, chat, admin, usage
 from routers.ingest import process_upload_job
-from services import job_queue
+from routers.chat import process_chat_job
+from services import job_queue, chat_queue
 
 
 def get_api_key(request: Request) -> str:
@@ -24,26 +25,29 @@ app = FastAPI(
     title="RAG API",
     version="1.0.0",
     description=(
-        "A multi-tenant Retrieval-Augmented Generation API built with LangChain. "
-        "Free, pro, and enterprise plans use Ollama for local inference. "
-        "The gold plan routes chat requests to an external LLM provider (OpenAI, Gemini, or Anthropic) "
-        "configured via EXTERNAL_LLM_PROVIDER. "
-        "Each site gets isolated document storage, API key authentication, and plan-based usage limits."
+        "A multi-tenant Retrieval-Augmented Generation API built with LangChain and Ollama. "
+        "Each site gets isolated document storage, API key authentication, and plan-based usage limits. "
+        "Chat supports three modes: sync (default), streaming SSE (?stream=true), and async (?async=true). "
+        "File ingestion is always async (202 + poll)."
     ),
     openapi_tags=[
-        {"name": "status",    "description": "Health check. Returns server version, active Ollama model, and external LLM provider info."},
-        {"name": "chat",      "description": "Ask questions against your ingested documents. Gold plan sites are routed to the configured external LLM provider."},
+        {"name": "status",    "description": "Health check. Returns server version and active Ollama model."},
+        {"name": "chat",      "description": (
+            "Ask questions against your ingested documents. "
+            "Add ?stream=true for SSE token streaming (first token in ~1 s on fast hardware). "
+            "Add ?async=true to queue the request and get a job_id; poll GET /chat/status/{job_id} for the result."
+        )},
         {"name": "ingest",    "description": (
             "Upload and manage documents. Enforces per-plan storage limits "
-            "(free: 250 chunks, pro: 10 000 chunks, gold: 50 000 chunks, enterprise: unlimited). "
-            "File uploads (POST /ingest/file) are processed asynchronously: the endpoint returns 202 immediately "
-            "with a job_id. Poll GET /ingest/status/{job_id} for progress, queue position, and ETA. "
+            "(free: 250 chunks, pro: 10 000 chunks, enterprise: unlimited). "
+            "File uploads (POST /ingest/file) return 202 immediately with a job_id. "
+            "Poll GET /ingest/status/{job_id} for progress, queue position, and ETA. "
             "Failed jobs can be retried via POST /ingest/retry/{job_id} without re-uploading the file. "
             "Text ingestion (POST /ingest/text) is synchronous."
         )},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
         {"name": "admin",     "description": (
-            "Admin-only site management. Valid plans: free, pro, gold, enterprise. "
+            "Admin-only site management. Valid plans: free, pro, enterprise. "
             "PATCH /admin/sites/{id} updates plan and/or is_active in one call. "
             "POST /admin/sites/{id}/reset clears message logs (messages: true) and/or all vector chunks (files: true) — both fields default to false. "
             "POST /admin/sites/{id}/regenerate-key issues a new API key; the previous key is immediately invalidated and the new one is shown once."
@@ -96,6 +100,7 @@ async def startup():
     _validate_provider_config()
     init_db()
     asyncio.create_task(job_queue.run_worker(process_upload_job))
+    asyncio.create_task(chat_queue.run_worker(process_chat_job))
 
 
 app.include_router(status.router)

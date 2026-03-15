@@ -10,12 +10,17 @@ from tests.conftest import TestSession
 
 def test_get_plan_config_free():
     cfg = get_plan_config("free")
-    assert cfg == {"limit": 20, "resets_monthly": False, "unlimited": False}
+    assert cfg["limit"] == 20
+    assert cfg["resets_monthly"] is False
+    assert cfg["unlimited"] is False
+    assert cfg["chunk_limit"] == 250
 
 
 def test_get_plan_config_pro():
     cfg = get_plan_config("pro")
-    assert cfg == {"limit": 2000, "resets_monthly": True, "unlimited": False}
+    assert cfg["limit"] == 2000
+    assert cfg["resets_monthly"] is True
+    assert cfg["unlimited"] is False
 
 
 def test_get_plan_config_enterprise():

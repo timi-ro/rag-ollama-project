@@ -18,6 +18,9 @@ def mock_chat_services(mocker):
     mocker.patch("routers.chat.query_chunks", return_value=_MOCK_QUERY_RESULT)
     mocker.patch("routers.chat.get_llm", return_value=MagicMock())
     mocker.patch("routers.chat.generate_answer", return_value="Mocked answer")
+    # Isolate cache so tests don't affect each other
+    mocker.patch("routers.chat.get_cached", return_value=None)
+    mocker.patch("routers.chat.set_cached")
 
 
 def test_chat_happy_path(client, free_site):
@@ -82,3 +85,46 @@ def test_chat_logs_on_success(client, free_site):
     ).count()
     session.close()
     assert count == 1
+
+
+def test_chat_returns_from_cache(client, free_site, mocker):
+    site, raw_key = free_site
+    mocker.patch("routers.chat.get_cached", return_value={"answer": "Cached!", "sources": ["doc-1"]})
+    response = client.post("/chat", json={"question": "Cached question?"}, headers={"X-API-Key": raw_key})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] == "Cached!"
+    assert data["from_cache"] is True
+
+
+def test_chat_async_mode_returns_202(client, free_site):
+    site, raw_key = free_site
+    response = client.post(
+        "/chat?async=true",
+        json={"question": "Async question?"},
+        headers={"X-API-Key": raw_key},
+    )
+    assert response.status_code == 202
+    data = response.json()
+    assert "job_id" in data
+    assert data["status"] == "queued"
+    assert "poll_url" in data
+
+
+def test_chat_status_unknown_job(client, free_site):
+    site, raw_key = free_site
+    response = client.get("/chat/status/cj_doesnotexist", headers={"X-API-Key": raw_key})
+    assert response.status_code == 404
+
+
+def test_chat_status_known_job(client, free_site):
+    site, raw_key = free_site
+    create_resp = client.post(
+        "/chat?async=true",
+        json={"question": "Background question?"},
+        headers={"X-API-Key": raw_key},
+    )
+    job_id = create_resp.json()["job_id"]
+    response = client.get(f"/chat/status/{job_id}", headers={"X-API-Key": raw_key})
+    assert response.status_code == 200
+    assert response.json()["job_id"] == job_id
