@@ -16,8 +16,8 @@ def test_get_plan_config_free():
     assert cfg["chunk_limit"] == 250
 
 
-def test_get_plan_config_pro():
-    cfg = get_plan_config("pro")
+def test_get_plan_config_plus():
+    cfg = get_plan_config("plus")
     assert cfg["limit"] == 2000
     assert cfg["resets_monthly"] is True
     assert cfg["unlimited"] is False
@@ -81,7 +81,7 @@ def test_usage_count_pro_within_period():
     now = datetime.datetime.now(timezone.utc)
     site = Site(
         name="t", api_key_prefix="dddddddd", api_key_hash="hash4",
-        plan="pro", message_limit=2000, period_start=now,
+        plan="plus", message_limit=2000, period_start=now,
     )
     session.add(site)
     session.commit()
@@ -100,7 +100,7 @@ def test_usage_count_pro_expired_resets():
     old_date = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=31)
     site = Site(
         name="t", api_key_prefix="eeeeeeee", api_key_hash="hash5",
-        plan="pro", message_limit=2000, period_start=old_date,
+        plan="plus", message_limit=2000, period_start=old_date,
     )
     session.add(site)
     session.commit()

@@ -35,7 +35,7 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/admin/sites",
-            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan. Valid plans: free, pro, enterprise.",
+            "description": "Creates a new tenant site and returns its API key. The key is shown only once — save it immediately. Message and storage limits are set automatically by the chosen plan.\n\nValid plans:\n- free: 20 messages / 250 chunks / Ollama\n- plus: 2 000 messages/month / 10 000 chunks / Ollama\n- business: 5 000 messages/month / 50 000 chunks / per-site external LLM (configure via PATCH /admin/sites/{id}/llm)\n- enterprise: unlimited / Ollama",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
@@ -62,14 +62,14 @@
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/admin/sites/{{site_id}}",
-            "description": "Update any combination of plan and/or is_active for a site. All fields are optional — send only what you want to change.\n\nExamples:\n- Change plan: {\"plan\": \"pro\"}\n- Deactivate: {\"is_active\": false}\n- Reactivate: {\"is_active\": true}\n- Both at once: {\"plan\": \"pro\", \"is_active\": true}\n\nValid plans: free, pro, enterprise.",
+            "description": "Update any combination of plan and/or is_active for a site. All fields are optional — send only what you want to change.\n\nExamples:\n- Change plan: {\"plan\": \"plus\"}\n- Deactivate: {\"is_active\": false}\n- Reactivate: {\"is_active\": true}\n- Both at once: {\"plan\": \"business\", \"is_active\": true}\n\nValid plans: free, plus, business, enterprise.\nAfter upgrading to business, configure the LLM via PATCH /admin/sites/{id}/llm.",
             "header": [
               { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
               { "key": "Content-Type",   "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"pro\",\n  \"is_active\": true\n}"
+              "raw": "{\n  \"plan\": \"plus\",\n  \"is_active\": true\n}"
             }
           }
         },
@@ -86,6 +86,22 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"messages\": true,\n  \"files\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Configure Site LLM",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/admin/sites/{{site_id}}/llm",
+            "description": "Set the external LLM provider and API key for a business-plan site. Each site stores its own credentials — no shared server-side key is needed.\n\nValid providers: openai, gemini, anthropic\nmodel is optional — omit to use the provider default (gpt-4o-mini / gemini-2.0-flash / claude-3-5-haiku).\n\nThe site must be on the business plan. Returns 400 if the provider is invalid or the site is on a different plan.",
+            "header": [
+              { "key": "X-Admin-Secret", "value": "{{admin_secret}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"openai\",\n  \"model\": \"gpt-4o-mini\",\n  \"api_key\": \"sk-...\"\n}"
             }
           }
         },

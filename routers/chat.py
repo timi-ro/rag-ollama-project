@@ -90,7 +90,7 @@ async def process_chat_job(job: ChatJob) -> dict:
         results = query_chunks(site.id, question_embedding, n_results=5)
         context, sources = _extract_results(results)
 
-        answer = await _generate_sync(get_llm(site.plan), job.question, context, job.conversation_history)
+        answer = await _generate_sync(get_llm(site), job.question, context, job.conversation_history)
         set_cached(job.site_id, job.question, answer, sources)
 
         db.add(RequestLog(site_id=site.id, endpoint="/chat", status_code=200))
@@ -130,7 +130,7 @@ async def _stream_chat(site_id: int, req: ChatRequest):
         results = query_chunks(site.id, question_embedding, n_results=5)
         context, sources = _extract_results(results)
 
-        llm = get_llm(site.plan)
+        llm = get_llm(site)
         full_answer = ""
         async with llm_semaphore:
             async for token in generate_answer_stream(llm, req.question, context, req.conversation_history):
@@ -197,7 +197,7 @@ async def chat(
         results = query_chunks(site.id, question_embedding, n_results=5)
         context, sources = _extract_results(results)
 
-        answer = await _generate_sync(get_llm(site.plan), req.question, context, req.conversation_history)
+        answer = await _generate_sync(get_llm(site), req.question, context, req.conversation_history)
         set_cached(site.id, req.question, answer, sources)
 
         db.add(RequestLog(site_id=site.id, endpoint="/chat", status_code=200))

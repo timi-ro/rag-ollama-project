@@ -64,16 +64,16 @@ def free_site():
 
 
 @pytest.fixture
-def pro_site():
+def plus_site():
     import datetime
     raw_key = "prositea0123456789abcdefghijkl"  # 30 chars, prefix "prositea"
     key_hash = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
     session = TestSession()
     site = Site(
-        name="pro-test",
+        name="plus-test",
         api_key_prefix=raw_key[:8],
         api_key_hash=key_hash,
-        plan="pro",
+        plan="plus",
         message_limit=2000,
         period_start=datetime.datetime.now(timezone.utc),
     )

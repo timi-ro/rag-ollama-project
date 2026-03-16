@@ -1,21 +1,22 @@
 # 🤖 Local RAG System with Ollama & LangChain
 
-A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** — local by default, with optional cloud LLM support for the gold plan.
+A production-ready Retrieval-Augmented Generation (RAG) system built with **LangChain** and **Ollama** — local by default, with optional per-site cloud LLM support on the Business plan.
 
 ## ✨ Features
 
-- 🆓 **Free & Local by Default** - Free/pro/enterprise plans run entirely on Ollama, no external API keys needed
-- 🏠 **Runs Locally** - Complete privacy and offline operation for Ollama-powered plans; gold plan routes to a cloud LLM of your choice
-- ⚡ **Fast Responses** - Optimised retrieval pipeline with ChromaDB
+- 🆓 **Free & Local by Default** - Free/Plus/Enterprise plans run entirely on Ollama, no external API keys needed
+- 🏠 **Runs Locally** - Complete privacy and offline operation for Ollama-powered plans
+- 🤖 **Bring Your Own LLM** - Business plan sites each configure their own OpenAI, Gemini, or Anthropic key — no shared server credential
+- ⚡ **Fast Responses** - Streaming SSE, in-memory question cache, and separate LLM/embed semaphores
 - 📎 **Source Citations** - Every answer shows which documents it came from
 - 🧠 **Conversation History** - Follow-up questions with context awareness
 - 🌐 **Web Interface** - Streamlit-powered chat UI
-- 📄 **Multi-Format Support** - PDF, Word, HTML, CSV, Markdown, TXT
+- 📄 **Multi-Format Support** - PDF, Markdown, TXT
 - 🔌 **REST API** - FastAPI backend for integrating with external apps
 - 🏢 **Multi-Tenant** - Each client gets isolated documents and vector store
-- 📤 **Document Ingestion API** - Ingest text or files per tenant
+- 📤 **Async Document Ingestion** - Upload files and poll for status; text ingestion is synchronous
 - 🔑 **API Key Auth** - Per-site access control with hashed keys
-- 📊 **Plan & Usage Limits** - Per-site message limits with free/pro/gold/enterprise plans
+- 📊 **Plan & Usage Limits** - Per-site message limits with Free/Plus/Business/Enterprise plans
 - 🚦 **Rate Limiting** - 60 requests/minute per API key
 - 🐳 **Docker Support** - Full stack with one command
 
@@ -60,9 +61,11 @@ rag-ollama-project/
 ├── services/
 │   ├── embedding.py         # Ollama embeddings (singleton + batched)
 │   ├── vectorstore.py       # ChromaDB operations
-│   ├── concurrency.py       # Shared semaphores (embed + upload)
+│   ├── concurrency.py       # Shared semaphores (embed, llm, upload)
+│   ├── cache.py             # In-memory per-site question cache with TTL
 │   ├── job_queue.py         # Async upload job queue, status tracking, ETA, retry
-│   └── llm.py               # LLM routing (Ollama + external providers)
+│   ├── chat_queue.py        # Async chat job queue for ?async=true mode
+│   └── llm.py               # LLM routing (Ollama + per-site external providers)
 ├── models/
 │   └── database.py          # SQLAlchemy models (sites, request_logs)
 ├── middleware/
@@ -167,13 +170,76 @@ API keys are shown **only once** when a site is created and are not stored in pl
 | Plan | Message limit | Resets | Storage (chunks) | Approx. storage | LLM |
 |------|--------------|--------|-----------------|----------------|-----|
 | `free` | 20 (all-time) | Never | 250 | ~3 MB | Ollama |
-| `pro` | 2,000 | Every 30 days (rolling) | 10,000 | ~130 MB | Ollama |
-| `gold` | 5,000 | Every 30 days (rolling) | 50,000 | ~650 MB | External (OpenAI / Gemini / Anthropic) |
+| `plus` | 2,000 | Every 30 days (rolling) | 10,000 | ~130 MB | Ollama |
+| `business` | 5,000 | Every 30 days (rolling) | 50,000 | ~650 MB | Per-site external LLM |
 | `enterprise` | Unlimited | — | Unlimited | — | Ollama |
 
 Only successful `/chat` requests (HTTP 200) count toward the message quota. Storage usage and remaining capacity are returned by the `/usage` endpoint under the `storage` key.
 
-The gold plan requires `EXTERNAL_LLM_PROVIDER` (and the matching API key) to be set before the server starts. Free, pro, and enterprise plans need no external keys.
+Free, Plus, and Enterprise plans use the shared Ollama instance — no external API keys needed. Business plan sites each bring their own credentials (see [Business plan LLM setup](#business-plan-llm-setup) below).
+
+### Business plan LLM setup
+
+Business plan sites use an external LLM provider. Each site configures its **own** API key — there is no shared server-side credential.
+
+**Step 1 — Create or upgrade the site to business:**
+```http
+POST /admin/sites
+X-Admin-Secret: <secret>
+
+{ "name": "my-site", "plan": "business" }
+```
+
+**Step 2 — Set the site's LLM credentials:**
+```http
+PATCH /admin/sites/{id}/llm
+X-Admin-Secret: <secret>
+
+{
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "api_key": "sk-..."
+}
+```
+
+Valid providers and their default models:
+
+| Provider | `provider` value | Default model |
+|----------|-----------------|---------------|
+| OpenAI | `openai` | `gpt-4o-mini` |
+| Google Gemini | `gemini` | `gemini-2.0-flash` |
+| Anthropic | `anthropic` | `claude-3-5-haiku-20241022` |
+
+`model` is optional — omit it to use the provider default. The API key is stored per-site in the database.
+
+---
+
+### Chat modes
+
+`POST /chat` supports three modes via query parameters:
+
+| Mode | Query param | Behaviour |
+|------|------------|-----------|
+| Sync (default) | *(none)* | Waits for the full answer, returns JSON |
+| Streaming | `?stream=true` | Returns SSE stream — tokens appear as they're generated |
+| Async | `?async=true` | Returns 202 with `job_id`; poll `GET /chat/status/{job_id}` |
+
+**Streaming response format (SSE):**
+```
+data: {"token": "The "}
+data: {"token": "answer "}
+data: {"token": "is..."}
+data: {"done": true, "sources": ["doc-1"]}
+```
+
+Cache hit (identical question asked recently by the same site):
+```
+data: {"answer": "...", "sources": [...], "done": true, "from_cache": true}
+```
+
+The in-memory question cache has a 5-minute TTL by default (`CHAT_CACHE_TTL`). Cached responses return instantly without touching the LLM.
+
+---
 
 ### File upload — async job queue
 
@@ -245,6 +311,7 @@ Returns the same 202 shape as the original upload with the new queue position an
 | `POST` | `/admin/sites` | Create site, returns API key once |
 | `GET` | `/admin/sites` | List all sites |
 | `PATCH` | `/admin/sites/{id}` | Update plan and/or active status |
+| `PATCH` | `/admin/sites/{id}/llm` | Configure external LLM for a business-plan site |
 | `POST` | `/admin/sites/{id}/reset` | Clear message logs and/or all documents |
 | `POST` | `/admin/sites/{id}/regenerate-key` | Issue a new API key, invalidates the old one |
 
@@ -253,7 +320,7 @@ Returns the same 202 shape as the original upload with the new queue position an
 PATCH /admin/sites/{id}
 X-Admin-Secret: <secret>
 
-{ "plan": "pro", "is_active": true }
+{ "plan": "plus", "is_active": true }
 ```
 
 **Reset usage** — both flags default to `false`, opt in explicitly:
@@ -290,12 +357,9 @@ The previous key stops working immediately. Save the new key — it cannot be re
 {
   "status": "ok",
   "version": "1.0.0",
-  "ollama": { "model": "llama3.2" },
-  "external_llm": { "provider": "openai", "model": "gpt-4o-mini" }
+  "ollama": { "model": "llama3.2" }
 }
 ```
-
-`external_llm.provider` is `null` when `EXTERNAL_LLM_PROVIDER` is not configured.
 
 ### Rate limiting
 
@@ -321,12 +385,7 @@ The previous key stops working immediately. Save the new key — it cannot be re
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `OLLAMA_MODEL` | `llama3.2` | Model used for all Ollama-powered plans (free, pro, enterprise) |
-| `EXTERNAL_LLM_PROVIDER` | *(none)* | LLM provider for the gold plan: `openai`, `gemini`, or `anthropic`. Server refuses to start if set to an unsupported value or if the matching API key is missing. |
-| `EXTERNAL_LLM_MODEL` | *(provider default)* | Override the model for the external provider. Defaults: `gpt-4o-mini` (OpenAI), `gemini-2.0-flash` (Gemini), `claude-3-5-haiku-20241022` (Anthropic). |
-| `OPENAI_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=openai` |
-| `GOOGLE_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=gemini` |
-| `ANTHROPIC_API_KEY` | *(none)* | Required when `EXTERNAL_LLM_PROVIDER=anthropic` |
+| `OLLAMA_MODEL` | `llama3.2` | Model used for all Ollama-powered plans (free, plus, enterprise) |
 | `CHROMA_DB_PATH` | `./chroma_db` | Vector store path |
 | `SQLITE_DB_PATH` | `./sites.db` | SQLite database path |
 | `ADMIN_SECRET` | **required** | Secret for admin endpoints. The server refuses to start if unset or set to the placeholder value. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
@@ -334,6 +393,10 @@ The previous key stops working immediately. Save the new key — it cannot be re
 | `MAX_UPLOAD_BYTES` | `10485760` | Maximum file/text upload size in bytes (default 10 MB) |
 | `EMBED_BATCH_SIZE` | `16` | Number of text chunks sent to Ollama per embedding call. Lower values reduce CPU spike; higher values increase throughput. |
 | `MAX_INFLIGHT_UPLOADS` | `10` | Maximum number of upload requests actively streaming to disk at the same time. Excess requests queue in memory with negligible overhead. |
+| `CHAT_CACHE_TTL` | `300` | Seconds before a cached question expires (default 5 min). Set to `0` to disable caching. |
+| `CHAT_CACHE_MAX` | `500` | Maximum number of cached questions per server. Oldest entries are evicted when the limit is reached. |
+
+> **Business plan LLM credentials** (OpenAI key, Gemini key, etc.) are stored per-site in the database via `PATCH /admin/sites/{id}/llm` — no server-level environment variables are needed.
 
 </details>
 

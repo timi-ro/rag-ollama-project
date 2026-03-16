@@ -12,6 +12,7 @@ from middleware.auth import get_admin
 from models.database import SessionLocal, Site, RequestLog
 from services.plans import get_plan_config
 from services.vectorstore import delete_site_chunks
+from services.llm import VALID_PROVIDERS, PROVIDER_DEFAULTS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -157,6 +158,49 @@ def reset_site_usage(site_id: int, req: ResetUsageRequest, _=Depends(get_admin))
             cleared.append("files")
 
         return {"site_id": site_id, "cleared": cleared}
+    finally:
+        db.close()
+
+
+class ConfigureLLMRequest(BaseModel):
+    provider: str
+    model: Optional[str] = None
+    api_key: str
+
+
+@router.patch("/sites/{site_id}/llm")
+def configure_site_llm(site_id: int, req: ConfigureLLMRequest, _=Depends(get_admin)):
+    """Set the external LLM provider and API key for a business-plan site.
+
+    Each site stores its own credentials — no shared server-side API key is needed.
+    Valid providers: openai, gemini, anthropic.
+    Model is optional; omit to use the provider default.
+    """
+    if req.provider not in VALID_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid provider '{req.provider}'. Valid: {sorted(VALID_PROVIDERS)}",
+        )
+
+    db = SessionLocal()
+    try:
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if not site:
+            raise HTTPException(status_code=404, detail="Site not found")
+        if site.plan != "business":
+            raise HTTPException(
+                status_code=400,
+                detail="LLM configuration is only available for business plan sites.",
+            )
+        site.llm_provider = req.provider
+        site.llm_model = req.model
+        site.llm_api_key = req.api_key
+        db.commit()
+        return {
+            "site_id": site_id,
+            "llm_provider": site.llm_provider,
+            "llm_model": site.llm_model or PROVIDER_DEFAULTS[req.provider],
+        }
     finally:
         db.close()
 

@@ -7,8 +7,8 @@ from models.database import RequestLog
 
 PLAN_CONFIG = {
     "free":       {"limit": 20,   "resets_monthly": False, "unlimited": False, "chunk_limit": 250,    "llm": "ollama"},
-    "pro":        {"limit": 2000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 10_000, "llm": "ollama"},
-    "gold":       {"limit": 5000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 50_000, "llm": "external"},
+    "plus":       {"limit": 2000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 10_000, "llm": "ollama"},
+    "business":   {"limit": 5000, "resets_monthly": True,  "unlimited": False, "chunk_limit": 50_000, "llm": "external"},
     "enterprise": {"limit": None, "resets_monthly": False, "unlimited": True,  "chunk_limit": None,   "llm": "ollama"},
 }
 

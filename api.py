@@ -77,18 +77,6 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 _INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
 
 
-def _validate_provider_config():
-    provider = os.getenv("EXTERNAL_LLM_PROVIDER", "")
-    if not provider:
-        return  # not configured — gold plan will error at request time with a clear message
-    valid = {"openai", "gemini", "anthropic"}
-    if provider not in valid:
-        raise RuntimeError(f"EXTERNAL_LLM_PROVIDER={provider!r} is invalid. Valid: {valid}")
-    key_vars = {"openai": "OPENAI_API_KEY", "gemini": "GOOGLE_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
-    if not os.getenv(key_vars[provider]):
-        raise RuntimeError(f"EXTERNAL_LLM_PROVIDER={provider!r} requires {key_vars[provider]} to be set.")
-
-
 @app.on_event("startup")
 async def startup():
     secret = os.getenv("ADMIN_SECRET", "")
@@ -97,7 +85,6 @@ async def startup():
             "ADMIN_SECRET env var is not set or is still the default placeholder. "
             "Set a strong secret before starting the server."
         )
-    _validate_provider_config()
     init_db()
     asyncio.create_task(job_queue.run_worker(process_upload_job))
     asyncio.create_task(chat_queue.run_worker(process_chat_job))

@@ -14,8 +14,8 @@ def test_create_site_free(client):
     assert "api_key" in data
 
 
-def test_create_site_pro(client):
-    response = client.post("/admin/sites", json={"name": "mysite", "plan": "pro"}, headers=ADMIN)
+def test_create_site_plus(client):
+    response = client.post("/admin/sites", json={"name": "mysite", "plan": "plus"}, headers=ADMIN)
     assert response.status_code == 200
     assert response.json()["message_limit"] == 2000
 
@@ -33,7 +33,7 @@ def test_create_site_invalid_plan(client):
 
 def test_create_site_duplicate_name(client):
     client.post("/admin/sites", json={"name": "mysite", "plan": "free"}, headers=ADMIN)
-    response = client.post("/admin/sites", json={"name": "mysite", "plan": "pro"}, headers=ADMIN)
+    response = client.post("/admin/sites", json={"name": "mysite", "plan": "plus"}, headers=ADMIN)
     assert response.status_code == 409
 
 
@@ -49,10 +49,10 @@ def test_list_sites(client):
 def test_update_site_plan(client):
     create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "free"}, headers=ADMIN)
     site_id = create_resp.json()["site_id"]
-    response = client.patch(f"/admin/sites/{site_id}", json={"plan": "pro"}, headers=ADMIN)
+    response = client.patch(f"/admin/sites/{site_id}", json={"plan": "plus"}, headers=ADMIN)
     assert response.status_code == 200
     data = response.json()
-    assert data["plan"] == "pro"
+    assert data["plan"] == "plus"
     assert data["message_limit"] == 2000
 
 
@@ -76,10 +76,10 @@ def test_update_site_reactivate(client):
 def test_update_site_plan_and_status_together(client):
     create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "free"}, headers=ADMIN)
     site_id = create_resp.json()["site_id"]
-    response = client.patch(f"/admin/sites/{site_id}", json={"plan": "pro", "is_active": False}, headers=ADMIN)
+    response = client.patch(f"/admin/sites/{site_id}", json={"plan": "plus", "is_active": False}, headers=ADMIN)
     assert response.status_code == 200
     data = response.json()
-    assert data["plan"] == "pro"
+    assert data["plan"] == "plus"
     assert data["is_active"] is False
 
 
@@ -118,6 +118,42 @@ def test_reset_nothing_returns_400(client):
     create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "free"}, headers=ADMIN)
     site_id = create_resp.json()["site_id"]
     response = client.post(f"/admin/sites/{site_id}/reset", json={}, headers=ADMIN)
+    assert response.status_code == 400
+
+
+def test_configure_llm_business_plan(client):
+    create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "business"}, headers=ADMIN)
+    site_id = create_resp.json()["site_id"]
+    response = client.patch(
+        f"/admin/sites/{site_id}/llm",
+        json={"provider": "openai", "model": "gpt-4o-mini", "api_key": "sk-test"},
+        headers=ADMIN,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["llm_provider"] == "openai"
+    assert data["llm_model"] == "gpt-4o-mini"
+
+
+def test_configure_llm_invalid_provider(client):
+    create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "business"}, headers=ADMIN)
+    site_id = create_resp.json()["site_id"]
+    response = client.patch(
+        f"/admin/sites/{site_id}/llm",
+        json={"provider": "cohere", "api_key": "key"},
+        headers=ADMIN,
+    )
+    assert response.status_code == 400
+
+
+def test_configure_llm_wrong_plan(client):
+    create_resp = client.post("/admin/sites", json={"name": "site1", "plan": "free"}, headers=ADMIN)
+    site_id = create_resp.json()["site_id"]
+    response = client.patch(
+        f"/admin/sites/{site_id}/llm",
+        json={"provider": "openai", "api_key": "sk-test"},
+        headers=ADMIN,
+    )
     assert response.status_code == 400
 
 

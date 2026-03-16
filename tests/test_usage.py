@@ -10,8 +10,8 @@ def test_usage_free(client, free_site):
     assert data["resets_monthly"] is False
 
 
-def test_usage_pro(client, pro_site):
-    site, raw_key = pro_site
+def test_usage_plus(client, plus_site):
+    site, raw_key = plus_site
     response = client.get("/usage", headers={"X-API-Key": raw_key})
     assert response.status_code == 200
     data = response.json()
