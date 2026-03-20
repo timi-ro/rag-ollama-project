@@ -7,6 +7,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from qdrant_client import QdrantClient
+from qdrant_client.models import VectorParams, Distance
+
+import services.vectorstore as _vs
+
 from models.database import Base, Site, RequestLog
 
 TEST_ENGINE = create_engine(
@@ -27,12 +32,36 @@ _SESSION_TARGETS = [
 
 
 @pytest.fixture(autouse=True)
+def qdrant_memory(monkeypatch):
+    """Replace the Qdrant client with an in-memory instance for each test."""
+    client = QdrantClient(":memory:")
+    client.create_collection(
+        collection_name=_vs.COLLECTION_NAME,
+        vectors_config=VectorParams(size=10, distance=Distance.COSINE),
+    )
+    monkeypatch.setattr(_vs, "_client", client)
+    monkeypatch.setattr(_vs, "EMBED_DIM", 10)
+    yield
+    monkeypatch.setattr(_vs, "_client", None)
+
+
+@pytest.fixture(autouse=True)
 def reset_db(monkeypatch):
     Base.metadata.create_all(TEST_ENGINE)
     for target in _SESSION_TARGETS:
         monkeypatch.setattr(target, TestSession)
     monkeypatch.setattr("api.init_db", lambda: None)
     monkeypatch.setenv("ADMIN_SECRET", "test-secret")
+
+    # Prevent the background workers from starting during tests.
+    # The workers run infinite loops that outlive each TestClient's event loop,
+    # causing "Future attached to different loop" errors surfaced by newer anyio.
+    async def _noop(*args):
+        pass
+
+    from services import job_queue, chat_queue
+    monkeypatch.setattr(job_queue, "run_worker", _noop)
+    monkeypatch.setattr(chat_queue, "run_worker", _noop)
     yield
     Base.metadata.drop_all(TEST_ENGINE)
 

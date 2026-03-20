@@ -1,99 +1,154 @@
 import os
-import chromadb
+import uuid
+
 from dotenv import load_dotenv
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    Filter, FieldCondition, MatchValue,
+    FilterSelector,
+)
 
 load_dotenv()
 
-CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 COLLECTION_NAME = "rag_documents"
+EMBED_DIM = int(os.getenv("EMBED_DIM", "3072"))  # llama3.2 default
+
+_UUID_NS = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # stable namespace
 
 _client = None
-_collection = None
 
 
-def _get_collection():
-    global _client, _collection
+def _get_client() -> QdrantClient:
+    global _client
     if _client is None:
-        _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-    if _collection is None:
-        _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    return _collection
+        _client = QdrantClient(url=QDRANT_URL)
+        if not _client.collection_exists(COLLECTION_NAME):
+            _client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(size=EMBED_DIM, distance=Distance.COSINE),
+            )
+    return _client
+
+
+def _point_id(site_id: int, doc_id: str, chunk_index: int) -> str:
+    """Deterministic UUID from the logical chunk identifier."""
+    return str(uuid.uuid5(_UUID_NS, f"{site_id}_{doc_id}_{chunk_index}"))
+
+
+def _site_filter(site_id: int) -> Filter:
+    return Filter(must=[FieldCondition(key="site_id", match=MatchValue(value=str(site_id)))])
+
+
+def _doc_filter(site_id: int, doc_id: str) -> Filter:
+    return Filter(must=[
+        FieldCondition(key="site_id", match=MatchValue(value=str(site_id))),
+        FieldCondition(key="doc_id",  match=MatchValue(value=doc_id)),
+    ])
 
 
 def upsert_chunks(site_id: int, doc_id: str, title: str, chunks: list, embeddings: list):
-    collection = _get_collection()
+    client = _get_client()
     try:
-        collection.delete(where={"$and": [{"site_id": str(site_id)}, {"doc_id": doc_id}]})
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=FilterSelector(filter=_doc_filter(site_id, doc_id)),
+        )
     except Exception:
         pass
     if not chunks:
         return
-    ids = [f"{site_id}_{doc_id}_{i}" for i in range(len(chunks))]
-    collection.add(
-        ids=ids,
-        embeddings=embeddings,
-        documents=chunks,
-        metadatas=[{"site_id": str(site_id), "doc_id": doc_id, "title": title} for _ in chunks],
-    )
+    points = [
+        PointStruct(
+            id=_point_id(site_id, doc_id, i),
+            vector=embeddings[i],
+            payload={
+                "site_id": str(site_id),
+                "doc_id":  doc_id,
+                "title":   title,
+                "text":    chunks[i],
+            },
+        )
+        for i in range(len(chunks))
+    ]
+    client.upsert(collection_name=COLLECTION_NAME, points=points)
 
 
 def query_chunks(site_id: int, embedding: list, n_results: int = 5) -> dict:
-    collection = _get_collection()
-    return collection.query(
-        query_embeddings=[embedding],
-        where={"site_id": str(site_id)},
-        n_results=n_results,
-        include=["documents", "metadatas", "distances"],
+    client = _get_client()
+    results = client.search(
+        collection_name=COLLECTION_NAME,
+        query_vector=embedding,
+        query_filter=_site_filter(site_id),
+        limit=n_results,
+        with_payload=True,
     )
+    # Preserve the same return shape routers/chat.py expects from ChromaDB
+    documents = [[r.payload["text"] for r in results]]
+    metadatas = [[{"doc_id": r.payload["doc_id"], "title": r.payload.get("title", "")} for r in results]]
+    distances = [[r.score for r in results]]
+    return {"documents": documents, "metadatas": metadatas, "distances": distances}
 
 
-def list_docs(site_id: int) -> list[dict]:
-    collection = _get_collection()
-    result = collection.get(
-        where={"site_id": str(site_id)},
-        include=["metadatas"],
-    )
+def list_docs(site_id: int) -> list:
+    client = _get_client()
     seen = {}
-    for meta in result.get("metadatas") or []:
-        doc_id = meta["doc_id"]
-        if doc_id not in seen:
-            seen[doc_id] = {"doc_id": doc_id, "title": meta.get("title", "")}
-        seen[doc_id]["chunk_count"] = seen[doc_id].get("chunk_count", 0) + 1
+    offset = None
+    while True:
+        batch, offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=_site_filter(site_id),
+            limit=256,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        for point in batch:
+            doc_id = point.payload["doc_id"]
+            if doc_id not in seen:
+                seen[doc_id] = {"doc_id": doc_id, "title": point.payload.get("title", ""), "chunk_count": 0}
+            seen[doc_id]["chunk_count"] += 1
+        if offset is None:
+            break
     return list(seen.values())
 
 
 def count_chunks(site_id: int) -> int:
-    """Return total number of chunks stored for a site."""
-    collection = _get_collection()
-    result = collection.get(where={"site_id": str(site_id)}, include=[])
-    return len(result["ids"])
+    client = _get_client()
+    return client.count(
+        collection_name=COLLECTION_NAME,
+        count_filter=_site_filter(site_id),
+        exact=True,
+    ).count
 
 
 def count_doc_chunks(site_id: int, doc_id: str) -> int:
-    """Return number of chunks stored for a specific document."""
-    collection = _get_collection()
-    result = collection.get(
-        where={"$and": [{"site_id": str(site_id)}, {"doc_id": doc_id}]},
-        include=[],
-    )
-    return len(result["ids"])
+    client = _get_client()
+    return client.count(
+        collection_name=COLLECTION_NAME,
+        count_filter=_doc_filter(site_id, doc_id),
+        exact=True,
+    ).count
 
 
 def delete_doc_chunks(site_id: int, doc_id: str):
-    collection = _get_collection()
+    client = _get_client()
     try:
-        collection.delete(where={"$and": [{"site_id": str(site_id)}, {"doc_id": doc_id}]})
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=FilterSelector(filter=_doc_filter(site_id, doc_id)),
+        )
     except Exception:
         pass
 
 
 def delete_site_chunks(site_id: int):
-    """Delete all chunks for a site (all documents)."""
-    collection = _get_collection()
+    client = _get_client()
     try:
-        collection.delete(where={"site_id": str(site_id)})
+        client.delete(
+            collection_name=COLLECTION_NAME,
+            points_selector=FilterSelector(filter=_site_filter(site_id)),
+        )
     except Exception:
         pass

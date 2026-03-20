@@ -4,8 +4,7 @@ langchain-ollama==0.3.3
 langchain-openai==0.3.16
 langchain-google-genai==2.1.2
 langchain-anthropic==0.3.15
-langchain-chroma==0.2.6
-chromadb==1.4.1
+qdrant-client
 pypdf==5.1.0
 docx2txt==0.8
 unstructured==0.16.11
