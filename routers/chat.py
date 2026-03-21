@@ -40,14 +40,14 @@ class ChatRequest(BaseModel):
 
 async def _embed_question(question: str) -> list:
     async with embed_semaphore:
-        return await asyncio.get_event_loop().run_in_executor(
+        return await asyncio.get_running_loop().run_in_executor(
             None, get_embeddings().embed_query, question
         )
 
 
 async def _generate_sync(llm, question: str, context: str, history: list) -> str:
     async with llm_semaphore:
-        return await asyncio.get_event_loop().run_in_executor(
+        return await asyncio.get_running_loop().run_in_executor(
             None, generate_answer, llm, question, context, history
         )
 

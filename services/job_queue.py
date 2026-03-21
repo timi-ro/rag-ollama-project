@@ -1,10 +1,13 @@
 import asyncio
+import logging
 import os
 import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Literal, Callable, Awaitable, Optional
+
+logger = logging.getLogger(__name__)
 
 JobStatus = Literal["queued", "processing", "done", "failed"]
 
@@ -133,6 +136,7 @@ async def run_worker(process_fn: Callable[["UploadJob"], Awaitable[dict]]):
         except Exception as exc:
             job.status = "failed"
             job.error = str(exc)
+            logger.exception("Upload job %s failed: %s", job.job_id, exc)
         finally:
             job.completed_at = time.time()
             if job.started_at is not None:

@@ -13,6 +13,7 @@ from models.database import SessionLocal, Site, RequestLog
 from services.plans import get_plan_config
 from services.vectorstore import delete_site_chunks
 from services.llm import VALID_PROVIDERS, PROVIDER_DEFAULTS
+from services.crypto import encrypt_field
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -194,7 +195,7 @@ def configure_site_llm(site_id: int, req: ConfigureLLMRequest, _=Depends(get_adm
             )
         site.llm_provider = req.provider
         site.llm_model = req.model
-        site.llm_api_key = req.api_key
+        site.llm_api_key = encrypt_field(req.api_key)
         db.commit()
         return {
             "site_id": site_id,

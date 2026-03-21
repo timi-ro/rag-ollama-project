@@ -21,6 +21,12 @@ services:
       - "6334:6334"   # gRPC
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   rag-api:
     build: .
@@ -40,7 +46,7 @@ services:
       ollama:
         condition: service_healthy
       qdrant:
-        condition: service_started
+        condition: service_healthy
 
   streamlit:
     build: .

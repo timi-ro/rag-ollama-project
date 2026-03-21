@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
+from services.crypto import decrypt_field
 from services.plans import PLAN_CONFIG
 
 load_dotenv()
@@ -39,7 +40,7 @@ def get_llm(site):
             "Ask your administrator to set it via PATCH /admin/sites/{id}/llm."
         )
 
-    api_key = site.llm_api_key
+    api_key = decrypt_field(site.llm_api_key) if site.llm_api_key else None
     if not api_key:
         raise RuntimeError(
             f"API key missing for provider '{provider}'. "

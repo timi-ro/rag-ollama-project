@@ -1,8 +1,11 @@
 import asyncio
+import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Literal, Optional, Callable, Awaitable
+
+logger = logging.getLogger(__name__)
 
 ChatJobStatus = Literal["queued", "processing", "done", "failed"]
 
@@ -75,6 +78,7 @@ async def run_worker(process_fn: Callable[["ChatJob"], Awaitable[dict]]):
         except Exception as exc:
             job.status = "failed"
             job.error = str(exc)
+            logger.exception("Chat job %s failed: %s", job.job_id, exc)
         finally:
             job.completed_at = time.time()
             _queue.task_done()

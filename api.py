@@ -1,5 +1,6 @@
 import asyncio
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,25 @@ def get_api_key(request: Request) -> str:
 
 limiter = Limiter(key_func=get_api_key, default_limits=["60/minute"])
 
+_INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    secret = os.getenv("ADMIN_SECRET", "")
+    if secret in _INSECURE_SECRET_DEFAULTS:
+        raise RuntimeError(
+            "ADMIN_SECRET env var is not set or is still the default placeholder. "
+            "Set a strong secret before starting the server."
+        )
+    init_db()
+    asyncio.create_task(job_queue.run_worker(process_upload_job))
+    asyncio.create_task(chat_queue.run_worker(process_chat_job))
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="RAG API",
     version="1.0.0",
     description=(
@@ -72,22 +91,6 @@ app.add_middleware(
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse({"error": "RATE_LIMIT_EXCEEDED"}, status_code=429)
-
-
-_INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
-
-
-@app.on_event("startup")
-async def startup():
-    secret = os.getenv("ADMIN_SECRET", "")
-    if secret in _INSECURE_SECRET_DEFAULTS:
-        raise RuntimeError(
-            "ADMIN_SECRET env var is not set or is still the default placeholder. "
-            "Set a strong secret before starting the server."
-        )
-    init_db()
-    asyncio.create_task(job_queue.run_worker(process_upload_job))
-    asyncio.create_task(chat_queue.run_worker(process_chat_job))
 
 
 app.include_router(status.router)
