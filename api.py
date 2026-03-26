@@ -54,11 +54,12 @@ app = FastAPI(
         {"name": "chat",      "description": (
             "Ask questions against your ingested documents. "
             "Add ?stream=true for SSE token streaming (first token in ~1 s on fast hardware). "
-            "Add ?async=true to queue the request and get a job_id; poll GET /chat/status/{job_id} for the result."
+            "Add ?async=true to queue the request and get a job_id; poll GET /chat/status/{job_id} for the result. "
+            "Add ?doc_id=<id> to scope retrieval to a single document, or ?file_type=pdf|docx|text|md to filter by file type."
         )},
         {"name": "ingest",    "description": (
-            "Upload and manage documents. Enforces per-plan storage limits "
-            "(free: 250 chunks, pro: 10 000 chunks, enterprise: unlimited). "
+            "Upload and manage documents. Supported formats: PDF, DOCX, TXT, MD. "
+            "Enforces per-plan storage limits (free: 250 chunks, plus: 10 000, business: 50 000, enterprise: unlimited). "
             "File uploads (POST /ingest/file) return 202 immediately with a job_id. "
             "Poll GET /ingest/status/{job_id} for progress, queue position, and ETA. "
             "Failed jobs can be retried via POST /ingest/retry/{job_id} without re-uploading the file. "
@@ -66,8 +67,9 @@ app = FastAPI(
         )},
         {"name": "usage",     "description": "Query message quota and storage usage. The response includes a 'storage' key with chunk_limit, chunks_used, and chunks_remaining."},
         {"name": "admin",     "description": (
-            "Admin-only site management. Valid plans: free, pro, enterprise. "
+            "Admin-only site management. Valid plans: free, plus, business, enterprise. "
             "PATCH /admin/sites/{id} updates plan and/or is_active in one call. "
+            "PATCH /admin/sites/{id}/llm sets the external LLM provider and API key for business-plan sites. "
             "POST /admin/sites/{id}/reset clears message logs (messages: true) and/or all vector chunks (files: true) — both fields default to false. "
             "POST /admin/sites/{id}/regenerate-key issues a new API key; the previous key is immediately invalidated and the new one is shown once."
         )},

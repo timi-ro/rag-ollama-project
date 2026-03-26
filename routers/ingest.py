@@ -8,8 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Annotated, Optional
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from services.chunking import chunk_pdf, chunk_docx, chunk_text
 
 from middleware.auth import get_site
 from models.database import Site, SessionLocal
@@ -22,9 +21,7 @@ from services.job_queue import UploadJob
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
-_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-
-SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))  # default 10 MB
 _STREAM_CHUNK = 64 * 1024  # 64 KB read buffer
 
@@ -63,36 +60,38 @@ def _check_chunk_limit(site: Site, doc_id: str, new_chunk_count: int):
 
 async def process_upload_job(job: UploadJob) -> dict:
     """Process a queued file upload: parse → split → embed → store."""
-    # Re-fetch the site from DB so we have up-to-date plan/quota info
     with SessionLocal() as db:
         site = db.query(Site).filter(Site.id == job.site_id).first()
     if site is None:
         raise ValueError(f"Site {job.site_id} not found")
 
-    loader = PyPDFLoader(job.tmp_path) if job.ext == ".pdf" else TextLoader(job.tmp_path)
-    docs = loader.load()
-    all_chunks = []
-    for doc in docs:
-        all_chunks.extend(_splitter.split_text(doc.page_content))
+    if job.ext == ".pdf":
+        chunks = chunk_pdf(job.tmp_path)
+    elif job.ext == ".docx":
+        chunks = chunk_docx(job.tmp_path)
+    else:
+        with open(job.tmp_path, encoding="utf-8", errors="replace") as fh:
+            chunks = chunk_text(fh.read(), file_type=job.ext.lstrip("."))
 
-    if not all_chunks:
+    if not chunks:
         raise ValueError("File produced no chunks")
 
     doc_id = _safe_doc_id(job.filename)
 
     try:
-        _check_chunk_limit(site, doc_id, len(all_chunks))
+        _check_chunk_limit(site, doc_id, len(chunks))
     except HTTPException as exc:
         detail = exc.detail
         raise ValueError(detail if isinstance(detail, str) else str(detail))
 
+    texts = [c.text for c in chunks]
     async with embed_semaphore:
-        embeddings = await asyncio.get_event_loop().run_in_executor(
-            None, embed_in_batches, all_chunks
+        embeddings = await asyncio.get_running_loop().run_in_executor(
+            None, embed_in_batches, texts
         )
-        upsert_chunks(site.id, doc_id, doc_id, all_chunks, embeddings)
+        upsert_chunks(site.id, doc_id, doc_id, chunks, embeddings)
 
-    return {"ingested": len(all_chunks), "doc_id": doc_id}
+    return {"ingested": len(chunks), "doc_id": doc_id}
 
 
 # ---------------------------------------------------------------------------
@@ -136,13 +135,14 @@ class IngestTextRequest(BaseModel):
 @router.post("/text")
 async def ingest_text(req: IngestTextRequest, site: Site = Depends(get_site)):
     async with upload_semaphore:
-        chunks = _splitter.split_text(req.content)
+        chunks = chunk_text(req.content, file_type="text")
         if not chunks:
             raise HTTPException(status_code=400, detail="Content produced no chunks")
         _check_chunk_limit(site, req.doc_id, len(chunks))
+        texts = [c.text for c in chunks]
         async with embed_semaphore:
-            embeddings = await asyncio.get_event_loop().run_in_executor(
-                None, embed_in_batches, chunks
+            embeddings = await asyncio.get_running_loop().run_in_executor(
+                None, embed_in_batches, texts
             )
             upsert_chunks(site.id, req.doc_id, req.title, chunks, embeddings)
     return {"ingested": len(chunks), "doc_id": req.doc_id}

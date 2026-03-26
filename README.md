@@ -7,11 +7,11 @@ A production-ready Retrieval-Augmented Generation (RAG) system built with **Lang
 - 🆓 **Free & Local by Default** - Free/Plus/Enterprise plans run entirely on Ollama, no external API keys needed
 - 🏠 **Runs Locally** - Complete privacy and offline operation for Ollama-powered plans
 - 🤖 **Bring Your Own LLM** - Business plan sites each configure their own OpenAI, Gemini, or Anthropic key — no shared server credential
-- ⚡ **Fast Responses** - Streaming SSE, in-memory question cache, and separate LLM/embed semaphores
+- ⚡  **Fast Responses** - Streaming SSE, in-memory question cache, and separate LLM/embed semaphores
 - 📎 **Source Citations** - Every answer shows which documents it came from
 - 🧠 **Conversation History** - Follow-up questions with context awareness
 - 🌐 **Web Interface** - Streamlit-powered chat UI
-- 📄 **Multi-Format Support** - PDF, Markdown, TXT
+- 📄 **Multi-Format Support** - PDF, DOCX, Markdown, TXT
 - 🔌 **REST API** - FastAPI backend for integrating with external apps
 - 🏢 **Multi-Tenant** - Each client gets isolated documents and vector store
 - 📤 **Async Document Ingestion** - Upload files and poll for status; text ingestion is synchronous
@@ -37,7 +37,7 @@ Each tenant is fully isolated — one site can never access another site's data.
 
 - **LangChain** - RAG framework
 - **Ollama** - Local LLM (Llama 3.2)
-- **ChromaDB** - Vector database
+- **Qdrant** - Vector database (server mode, Docker)
 - **FastAPI** - REST API server
 - **SQLAlchemy + SQLite** - Site metadata and request logging
 - **slowapi** - Rate limiting
@@ -60,9 +60,12 @@ rag-ollama-project/
 │   └── admin.py             # Admin site management
 ├── services/
 │   ├── embedding.py         # Ollama embeddings (singleton + batched)
-│   ├── vectorstore.py       # ChromaDB operations
+│   ├── vectorstore.py       # Qdrant operations (upsert, query, filter, delete)
+│   ├── chunking.py          # Smart chunking: page-aware PDF, heading-aware DOCX, paragraph text
+│   ├── retrieval_eval.py    # Retrieval metrics: MRR and Recall@k
 │   ├── concurrency.py       # Shared semaphores (embed, llm, upload)
 │   ├── cache.py             # In-memory per-site question cache with TTL
+│   ├── crypto.py            # Fernet encryption for business plan API keys
 │   ├── job_queue.py         # Async upload job queue, status tracking, ETA, retry
 │   ├── chat_queue.py        # Async chat job queue for ?async=true mode
 │   └── llm.py               # LLM routing (Ollama + per-site external providers)
@@ -223,6 +226,13 @@ Valid providers and their default models:
 | Sync (default) | *(none)* | Waits for the full answer, returns JSON |
 | Streaming | `?stream=true` | Returns SSE stream — tokens appear as they're generated |
 | Async | `?async=true` | Returns 202 with `job_id`; poll `GET /chat/status/{job_id}` |
+
+Retrieval can be scoped with additional query params on all sync and streaming requests:
+
+| Param | Example | Effect |
+|-------|---------|--------|
+| `doc_id` | `?doc_id=report.pdf` | Only retrieve chunks from this document |
+| `file_type` | `?file_type=pdf` | Only retrieve chunks of this file type (`pdf`, `docx`, `text`, `md`) |
 
 **Streaming response format (SSE):**
 ```
@@ -386,7 +396,8 @@ The previous key stops working immediately. Save the new key — it cannot be re
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `llama3.2` | Model used for all Ollama-powered plans (free, plus, enterprise) |
-| `CHROMA_DB_PATH` | `./chroma_db` | Vector store path |
+| `QDRANT_URL` | `http://localhost:6333` | Qdrant server URL |
+| `EMBED_DIM` | `3072` | Embedding dimension — must match the Ollama model (llama3.2 = 3072) |
 | `SQLITE_DB_PATH` | `./sites.db` | SQLite database path |
 | `ADMIN_SECRET` | **required** | Secret for admin endpoints. The server refuses to start if unset or set to the placeholder value. Generate with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` |
 | `ALLOWED_ORIGINS` | *(none)* | Comma-separated list of allowed CORS origins, e.g. `https://app.example.com`. Leave empty to block all cross-origin requests. |
@@ -395,6 +406,7 @@ The previous key stops working immediately. Save the new key — it cannot be re
 | `MAX_INFLIGHT_UPLOADS` | `10` | Maximum number of upload requests actively streaming to disk at the same time. Excess requests queue in memory with negligible overhead. |
 | `CHAT_CACHE_TTL` | `300` | Seconds before a cached question expires (default 5 min). Set to `0` to disable caching. |
 | `CHAT_CACHE_MAX` | `500` | Maximum number of cached questions per server. Oldest entries are evicted when the limit is reached. |
+| `FERNET_KEY` | *(none)* | Fernet encryption key for business plan API keys at rest. Generate with `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. If unset, keys are stored in plaintext (not recommended for production). |
 
 > **Business plan LLM credentials** (OpenAI key, Gemini key, etc.) are stored per-site in the database via `PATCH /admin/sites/{id}/llm` — no server-level environment variables are needed.
 

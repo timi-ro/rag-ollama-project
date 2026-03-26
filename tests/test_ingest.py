@@ -35,7 +35,7 @@ def test_ingest_file_unsupported_extension(client, free_site):
     site, raw_key = free_site
     response = client.post(
         "/ingest/file",
-        files={"file": ("document.docx", b"some content", "application/octet-stream")},
+        files={"file": ("document.xlsx", b"some content", "application/octet-stream")},
         headers={"X-API-Key": raw_key},
     )
     assert response.status_code == 400

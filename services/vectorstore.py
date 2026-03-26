@@ -1,5 +1,6 @@
 import os
 import uuid
+from typing import Optional
 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
@@ -64,29 +65,44 @@ def upsert_chunks(site_id: int, doc_id: str, title: str, chunks: list, embedding
             id=_point_id(site_id, doc_id, i),
             vector=embeddings[i],
             payload={
-                "site_id": str(site_id),
-                "doc_id":  doc_id,
-                "title":   title,
-                "text":    chunks[i],
+                "site_id":        str(site_id),
+                "doc_id":         doc_id,
+                "title":          title,
+                "text":           chunk.text,
+                "file_type":      chunk.file_type,
+                "page":           chunk.page,
+                "section_title":  chunk.section_title,
             },
         )
-        for i in range(len(chunks))
+        for i, chunk in enumerate(chunks)
     ]
     client.upsert(collection_name=COLLECTION_NAME, points=points)
 
 
-def query_chunks(site_id: int, embedding: list, n_results: int = 5) -> dict:
+def query_chunks(site_id: int, embedding: list, n_results: int = 5,
+                 doc_id: Optional[str] = None, file_type: Optional[str] = None) -> dict:
     client = _get_client()
-    results = client.search(
+    conditions = [FieldCondition(key="site_id", match=MatchValue(value=str(site_id)))]
+    if doc_id:
+        conditions.append(FieldCondition(key="doc_id", match=MatchValue(value=doc_id)))
+    if file_type:
+        conditions.append(FieldCondition(key="file_type", match=MatchValue(value=file_type)))
+    response = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=embedding,
-        query_filter=_site_filter(site_id),
+        query=embedding,
+        query_filter=Filter(must=conditions),
         limit=n_results,
         with_payload=True,
     )
-    # Preserve the same return shape routers/chat.py expects from ChromaDB
+    results = response.points
     documents = [[r.payload["text"] for r in results]]
-    metadatas = [[{"doc_id": r.payload["doc_id"], "title": r.payload.get("title", "")} for r in results]]
+    metadatas = [[{
+        "doc_id":        r.payload["doc_id"],
+        "title":         r.payload.get("title", ""),
+        "page":          r.payload.get("page"),
+        "section_title": r.payload.get("section_title"),
+        "file_type":     r.payload.get("file_type", "text"),
+    } for r in results]]
     distances = [[r.score for r in results]]
     return {"documents": documents, "metadatas": metadatas, "distances": distances}
 
@@ -107,7 +123,7 @@ def list_docs(site_id: int) -> list:
         for point in batch:
             doc_id = point.payload["doc_id"]
             if doc_id not in seen:
-                seen[doc_id] = {"doc_id": doc_id, "title": point.payload.get("title", ""), "chunk_count": 0}
+                seen[doc_id] = {"doc_id": doc_id, "title": point.payload.get("title", ""), "file_type": point.payload.get("file_type", "text"), "chunk_count": 0}
             seen[doc_id]["chunk_count"] += 1
         if offset is None:
             break

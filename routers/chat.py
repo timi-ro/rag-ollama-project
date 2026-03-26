@@ -104,7 +104,7 @@ async def process_chat_job(job: ChatJob) -> dict:
 # Streaming SSE generator
 # ---------------------------------------------------------------------------
 
-async def _stream_chat(site_id: int, req: ChatRequest):
+async def _stream_chat(site_id: int, req: ChatRequest, doc_id: Optional[str] = None, file_type: Optional[str] = None):
     cached = get_cached(site_id, req.question)
     if cached:
         yield f"data: {json.dumps({**cached, 'done': True, 'from_cache': True})}\n\n"
@@ -127,7 +127,7 @@ async def _stream_chat(site_id: int, req: ChatRequest):
                 return
 
         question_embedding = await _embed_question(req.question)
-        results = query_chunks(site.id, question_embedding, n_results=5)
+        results = query_chunks(site.id, question_embedding, n_results=5, doc_id=doc_id, file_type=file_type)
         context, sources = _extract_results(results)
 
         llm = get_llm(site)
@@ -156,6 +156,8 @@ async def chat(
     req: ChatRequest,
     stream: bool = Query(False),
     async_mode: bool = Query(False, alias="async"),
+    doc_id: Optional[str] = Query(None, description="Limit retrieval to a specific document"),
+    file_type: Optional[str] = Query(None, description="Limit retrieval to a specific file type (pdf, docx, text, md)"),
     site: Site = Depends(get_site),
 ):
     # Async mode: queue the job and return 202 immediately
@@ -169,7 +171,7 @@ async def chat(
 
     # Streaming mode: SSE token stream
     if stream:
-        return StreamingResponse(_stream_chat(site.id, req), media_type="text/event-stream")
+        return StreamingResponse(_stream_chat(site.id, req, doc_id=doc_id, file_type=file_type), media_type="text/event-stream")
 
     # Sync mode: cache → semaphores → response
     cached = get_cached(site.id, req.question)
@@ -194,7 +196,7 @@ async def chat(
                 })
 
         question_embedding = await _embed_question(req.question)
-        results = query_chunks(site.id, question_embedding, n_results=5)
+        results = query_chunks(site.id, question_embedding, n_results=5, doc_id=doc_id, file_type=file_type)
         context, sources = _extract_results(results)
 
         answer = await _generate_sync(get_llm(site), req.question, context, req.conversation_history)
