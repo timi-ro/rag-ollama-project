@@ -412,6 +412,35 @@ The previous key stops working immediately. Save the new key — it cannot be re
 
 </details>
 
+## 📈 Improvements & Curriculum Progress
+
+<details>
+<summary>Click to expand</summary>
+
+### Chunking & Retrieval Quality
+
+- [x] **Page tracking** — Extract text per page in PDF loading and store the page number in each chunk's Qdrant payload.
+- [x] **Section awareness** — Parse `docx` heading styles (`Heading 1`, `Heading 2`) to attach a `section_title` to each paragraph chunk.
+- [x] **Smarter chunking** — Replace character-based chunking with heading-aware and paragraph-boundary strategies to avoid splitting mid-sentence or mid-concept.
+- [x] **Richer payload** — Extend the Qdrant point payload to include `page`, `section_title`, and `file_type`.
+- [x] **Payload filtering** — Use Qdrant's `Filter` with `must` conditions to scope searches to a specific file, file type, or page range.
+- [x] **Retrieval evaluation** — Build a test set of question/answer pairs and measure retrieval precision using MRR and Recall@k metrics.
+
+### Testing
+
+- [x] **Unit tests for core functions** — `tests/test_chunking.py` covers `chunk_text`, `chunk_pdf`, `chunk_docx`, and `_split_text` (boundary conditions, empty input, section titles, page numbers). Coverage is enforced via `pytest --cov` with a minimum threshold of 40% (currently ~75%).
+
+### Mentor Feedback — Bugs & Quality Fixes
+
+- [x] **Shared-dict reference** — Replace `[{...}] * n` pattern with a list comprehension so each chunk gets its own metadata dict.
+- [x] **Bare `except Exception`** — Replace with specific exceptions so real errors aren't silently swallowed.
+- [x] **Scoped warning suppression** — Replace global `warnings.filterwarnings("ignore")` with targeted `warnings.catch_warnings()` blocks.
+- [x] **Cross-page chunking for PDFs** — Concatenate full-document text before chunking, while still recording the starting page number per chunk.
+- [x] **Group DOCX paragraphs before chunking** — Collect all paragraphs under a heading section into one block before chunking, so short paragraphs get merged.
+- [x] **Duplicate detection on ingest** — Query Qdrant for existing points with the same source filename before upserting to prevent doubled results on re-ingest.
+
+</details>
+
 ## 🐛 Troubleshooting
 
 <details>
