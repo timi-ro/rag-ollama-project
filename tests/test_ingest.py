@@ -8,6 +8,7 @@ def mock_ingest_services(mocker):
     mocker.patch("routers.ingest.upsert_chunks")
     mocker.patch("routers.ingest.delete_doc_chunks")
     mocker.patch("routers.ingest.list_docs", return_value=[{"doc_id": "doc-1", "title": "Test Doc"}])
+    mocker.patch("routers.ingest.count_doc_chunks", return_value=0)
 
 
 def test_ingest_text_happy_path(client, free_site):
@@ -104,3 +105,30 @@ def test_delete_document(client, free_site):
     response = client.delete("/ingest/doc-1", headers={"X-API-Key": raw_key})
     assert response.status_code == 200
     assert response.json()["deleted"] == "doc-1"
+
+
+def test_ingest_text_new_doc_replaced_false(client, free_site):
+    site, raw_key = free_site
+    response = client.post(
+        "/ingest/text",
+        json={"content": "New document content. " * 60, "doc_id": "new-doc"},
+        headers={"X-API-Key": raw_key},
+    )
+    assert response.status_code == 200
+    assert response.json()["replaced"] is False
+    assert "warning" not in response.json()
+
+
+def test_ingest_text_existing_doc_replaced_true(client, free_site, mocker):
+    site, raw_key = free_site
+    mocker.patch("routers.ingest.count_doc_chunks", return_value=5)
+    response = client.post(
+        "/ingest/text",
+        json={"content": "Updated content. " * 60, "doc_id": "existing-doc"},
+        headers={"X-API-Key": raw_key},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["replaced"] is True
+    assert "warning" in data
+    assert "existing-doc" in data["warning"]

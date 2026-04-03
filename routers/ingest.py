@@ -84,6 +84,7 @@ async def process_upload_job(job: UploadJob) -> dict:
         detail = exc.detail
         raise ValueError(detail if isinstance(detail, str) else str(detail))
 
+    existing = count_doc_chunks(site.id, doc_id)
     texts = [c.text for c in chunks]
     async with embed_semaphore:
         embeddings = await asyncio.get_running_loop().run_in_executor(
@@ -91,7 +92,10 @@ async def process_upload_job(job: UploadJob) -> dict:
         )
         upsert_chunks(site.id, doc_id, doc_id, chunks, embeddings)
 
-    return {"ingested": len(chunks), "doc_id": doc_id}
+    result = {"ingested": len(chunks), "doc_id": doc_id, "replaced": existing > 0}
+    if existing > 0:
+        result["warning"] = f"Document '{doc_id}' already existed ({existing} chunks replaced)."
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -140,12 +144,16 @@ async def ingest_text(req: IngestTextRequest, site: Site = Depends(get_site)):
             raise HTTPException(status_code=400, detail="Content produced no chunks")
         _check_chunk_limit(site, req.doc_id, len(chunks))
         texts = [c.text for c in chunks]
+        existing = count_doc_chunks(site.id, req.doc_id)
         async with embed_semaphore:
             embeddings = await asyncio.get_running_loop().run_in_executor(
                 None, embed_in_batches, texts
             )
             upsert_chunks(site.id, req.doc_id, req.title, chunks, embeddings)
-    return {"ingested": len(chunks), "doc_id": req.doc_id}
+    result = {"ingested": len(chunks), "doc_id": req.doc_id, "replaced": existing > 0}
+    if existing > 0:
+        result["warning"] = f"Document '{req.doc_id}' already existed ({existing} chunks replaced)."
+    return result
 
 
 @router.post("/file", status_code=202)
