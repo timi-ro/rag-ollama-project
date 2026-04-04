@@ -6,13 +6,13 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    entrypoint: ["/bin/bash", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
+    entrypoint: ["/bin/bash", "-c", "ollama serve & until ollama list 2>/dev/null; do sleep 2; done && ollama pull llama3.2 && wait"]
     healthcheck:
       test: ["CMD", "/bin/bash", "-c", "ollama list | grep llama3.2"]
       interval: 15s
       timeout: 10s
       retries: 20
-      start_period: 30s
+      start_period: 120s
 
   qdrant:
     image: qdrant/qdrant
@@ -21,12 +21,7 @@ services:
       - "6334:6334"   # gRPC
     volumes:
       - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    restart: unless-stopped
 
   rag-api:
     build: .
@@ -42,11 +37,12 @@ services:
       - .env
     volumes:
       - rag_data:/app/data
+    restart: on-failure
     depends_on:
       ollama:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
 
   streamlit:
     build: .
@@ -56,9 +52,14 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: llama3.2
+      QDRANT_URL: http://qdrant:6333
+      EMBED_DIM: 3072
+    restart: on-failure
     depends_on:
       ollama:
         condition: service_healthy
+      qdrant:
+        condition: service_started
 
 volumes:
   ollama_data:

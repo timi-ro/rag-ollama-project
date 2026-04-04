@@ -1,189 +1,137 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from langchain_community.llms import Ollama
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from langchain.chains import create_retrieval_chain, create_history_aware_retriever
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_community.document_loaders import (
-    TextLoader,
-    PyPDFLoader,
-    Docx2txtLoader,
-    UnstructuredHTMLLoader,
-    CSVLoader,
-)
 
-# File type to loader mapping
-LOADER_MAPPING = {
-    ".txt": TextLoader,
-    ".md": TextLoader,
-    ".pdf": PyPDFLoader,
-    ".docx": Docx2txtLoader,
-    ".html": UnstructuredHTMLLoader,
-    ".htm": UnstructuredHTMLLoader,
-    ".csv": CSVLoader,
-}
+# Dedicated site_id so Streamlit data is isolated from REST API tenants
+_SITE_ID = 0
 
 
-def load_documents(docs_dir: str = "./docs") -> list:
-    """Load documents from a directory, supporting multiple file types."""
-    documents = []
-    docs_path = Path(docs_dir)
-
-    if not docs_path.exists():
-        print(f"Warning: Directory {docs_dir} does not exist")
-        return documents
-
-    supported_extensions = set(LOADER_MAPPING.keys())
-
-    for file_path in docs_path.rglob("*"):
-        if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
-            ext = file_path.suffix.lower()
-            loader_cls = LOADER_MAPPING[ext]
-            try:
-                loader = loader_cls(str(file_path))
-                file_docs = loader.load()
-                documents.extend(file_docs)
-                print(f"  Loaded: {file_path.name} ({len(file_docs)} section(s))")
-            except Exception as e:
-                print(f"  Error loading {file_path.name}: {e}")
-
-    return documents
+@dataclass
+class _RAGConfig:
+    model: str
+    ollama_url: str
 
 
-def initialize(model: str = "llama3.2", docs_dir: str = "./docs", persist_dir: str = None):
-    """Initialize the RAG chain. Returns the chain object."""
-    if persist_dir is None:
-        persist_dir = f"./chroma_db/{model}"
+def initialize(model: str = "llama3.2", docs_dir: str = "./docs", persist_dir: str = None) -> _RAGConfig:
+    """Load all documents from docs_dir into Qdrant. Returns a config object."""
+    from services.chunking import chunk_pdf, chunk_docx, chunk_text
+    from services.embedding import embed_in_batches
+    from services.vectorstore import upsert_chunks, delete_site_chunks
+
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     print(f"Starting RAG system with model: {model}...")
+    delete_site_chunks(_SITE_ID)
 
-    print(f"Loading documents (supported: {', '.join(LOADER_MAPPING.keys())})...")
-    docs = load_documents(docs_dir)
-    print(f"Loaded {len(docs)} document sections total")
+    docs_path = Path(docs_dir)
+    if not docs_path.exists():
+        print(f"Warning: Directory {docs_dir} does not exist")
+        return _RAGConfig(model=model, ollama_url=ollama_url)
 
-    print("✂️  Splitting documents...")
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
-    splits = text_splitter.split_documents(docs)
-    print(f"✅ Created {len(splits)} chunks")
+    supported = {".pdf", ".txt", ".md", ".docx"}
+    total = 0
 
-    print("🧠 Creating embeddings (this may take a minute)...")
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    embeddings = OllamaEmbeddings(model=model, base_url=ollama_url)
-    vectorstore = Chroma.from_documents(
-        documents=splits,
-        embedding=embeddings,
-        persist_directory=persist_dir
-    )
-    print("✅ Vector store created")
+    for file_path in sorted(docs_path.rglob("*")):
+        if not file_path.is_file() or file_path.suffix.lower() not in supported:
+            continue
+        ext = file_path.suffix.lower()
+        try:
+            if ext == ".pdf":
+                chunks = chunk_pdf(str(file_path))
+            elif ext == ".docx":
+                chunks = chunk_docx(str(file_path))
+            else:
+                chunks = chunk_text(file_path.read_text(errors="replace"), file_type=ext.lstrip("."))
 
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+            if not chunks:
+                continue
 
-    print("🤖 Setting up LLM...")
-    llm = Ollama(model=model, base_url=ollama_url, temperature=0)
+            texts = [c.text for c in chunks]
+            embeddings = embed_in_batches(texts)
+            upsert_chunks(_SITE_ID, file_path.name, file_path.stem, chunks, embeddings)
+            total += len(chunks)
+            print(f"  Loaded: {file_path.name} ({len(chunks)} chunks)")
+        except Exception as e:
+            print(f"  Error loading {file_path.name}: {e}")
 
-    contextualize_prompt = ChatPromptTemplate.from_messages([
-        ("system",
-         "Given a chat history and the latest user question, "
-         "reformulate the question so it can be understood without "
-         "the chat history. Do NOT answer the question, just "
-         "reformulate it if needed, otherwise return it as is."),
-        MessagesPlaceholder("chat_history"),
-        ("human", "{input}"),
-    ])
-    history_aware_retriever = create_history_aware_retriever(
-        llm, retriever, contextualize_prompt
-    )
-
-    system_prompt = (
-        "You are an assistant for question-answering tasks. "
-        "Use the following pieces of retrieved context to answer "
-        "the question. If you don't know the answer, say that you "
-        "don't know. Use three sentences maximum and keep the "
-        "answer concise."
-        "\n\n"
-        "{context}"
-    )
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        MessagesPlaceholder("chat_history"),
-        ("human", "{input}"),
-    ])
-
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
-    print("✅ RAG chain ready")
-
-    return rag_chain
+    print(f"✅ {total} chunks indexed")
+    return _RAGConfig(model=model, ollama_url=ollama_url)
 
 
-def query(question: str, rag_chain, chat_history: list):
-    """Query the RAG chain with conversation history. Returns (answer, sources)."""
-    response = rag_chain.invoke({"input": question, "chat_history": chat_history})
-    chat_history.append(HumanMessage(content=question))
-    chat_history.append(AIMessage(content=response["answer"]))
-
-    sources = []
-    for doc in response.get("context", []):
-        source = Path(doc.metadata.get("source", "unknown")).name
-        if source not in sources:
-            sources.append(source)
-
-    return response["answer"], sources
+def _to_lc_messages(chat_history: list) -> list:
+    """Convert app.py dict history to LangChain message objects."""
+    out = []
+    for m in chat_history:
+        role = m.get("role") if isinstance(m, dict) else getattr(m, "role", "")
+        content = m.get("content", "") if isinstance(m, dict) else getattr(m, "content", "")
+        if role == "user":
+            out.append(HumanMessage(content=content))
+        elif role == "assistant":
+            out.append(AIMessage(content=content))
+    return out
 
 
-def query_stream(question: str, rag_chain, chat_history: list):
-    """Stream the RAG response token by token.
+def query(question: str, rag_config: _RAGConfig, chat_history: list):
+    """Query Qdrant and return (answer, sources). Updates chat_history in place."""
+    from services.embedding import get_embeddings
+    from services.vectorstore import query_chunks
+    from services.llm import _build_messages, generate_answer
+    from langchain_ollama import ChatOllama
 
-    Yields (token, sources) tuples. For all intermediate chunks, sources is None.
-    The final yielded tuple is ("", sources_list) and also updates chat_history.
+    embedding = get_embeddings().embed_query(question)
+    results = query_chunks(_SITE_ID, embedding, n_results=5)
+    context = "\n\n".join(results["documents"][0]) if results.get("documents") else ""
+    sources = list({m["doc_id"] for m in results["metadatas"][0]}) if results.get("metadatas") else []
+
+    llm = ChatOllama(model=rag_config.model, base_url=rag_config.ollama_url, temperature=0)
+    answer = generate_answer(llm, question, context, _to_lc_messages(chat_history))
+
+    chat_history.append({"role": "user", "content": question})
+    chat_history.append({"role": "assistant", "content": answer})
+    return answer, sources
+
+
+def query_stream(question: str, rag_config: _RAGConfig, chat_history: list):
+    """Stream the answer token by token. Yields (token, sources) tuples.
+
+    Intermediate yields: (token_str, None)
+    Final yield:         ("", sources_list)
+    Updates chat_history in place.
     """
-    sources = []
+    from services.embedding import get_embeddings
+    from services.vectorstore import query_chunks
+    from services.llm import _build_messages
+    from langchain_ollama import ChatOllama
+
+    embedding = get_embeddings().embed_query(question)
+    results = query_chunks(_SITE_ID, embedding, n_results=5)
+    context = "\n\n".join(results["documents"][0]) if results.get("documents") else ""
+    sources = list({m["doc_id"] for m in results["metadatas"][0]}) if results.get("metadatas") else []
+
+    llm = ChatOllama(model=rag_config.model, base_url=rag_config.ollama_url, temperature=0)
+    messages = _build_messages(question, context, _to_lc_messages(chat_history))
+
     full_answer = ""
+    for chunk in llm.stream(messages):
+        if hasattr(chunk, "content") and chunk.content:
+            full_answer += chunk.content
+            yield chunk.content, None
 
-    for chunk in rag_chain.stream({"input": question, "chat_history": chat_history}):
-        if "context" in chunk:
-            for doc in chunk["context"]:
-                source = Path(doc.metadata.get("source", "unknown")).name
-                if source not in sources:
-                    sources.append(source)
-        if "answer" in chunk:
-            full_answer += chunk["answer"]
-            yield chunk["answer"], None
-
-    chat_history.append(HumanMessage(content=question))
-    chat_history.append(AIMessage(content=full_answer))
+    chat_history.append({"role": "user", "content": question})
+    chat_history.append({"role": "assistant", "content": full_answer})
     yield "", sources
 
 
 if __name__ == "__main__":
-    rag_chain = initialize()
+    config = initialize()
     chat_history = []
 
-    print("\n" + "="*50)
-    question = "What is TypeScript?"
+    print("\n" + "=" * 50)
+    question = "What is in the documents?"
     print(f"❓ Question: {question}")
-    print("🤔 Thinking...")
-    answer, sources = query(question, rag_chain, chat_history)
+    answer, sources = query(question, config, chat_history)
     print(f"💡 Answer: {answer}")
     print(f"📎 Sources: {', '.join(sources)}")
-    print("="*50 + "\n")
-
-    # Interactive mode
-    print("🎮 Interactive mode - ask questions (type 'quit' to exit)")
-    while True:
-        user_question = input("\n❓ Your question: ")
-        if user_question.lower() in ['quit', 'exit', 'q']:
-            print("👋 Goodbye!")
-            break
-        print("🤔 Thinking...")
-        answer, sources = query(user_question, rag_chain, chat_history)
-        print(f"💡 Answer: {answer}")
-        print(f"📎 Sources: {', '.join(sources)}")
+    print("=" * 50 + "\n")

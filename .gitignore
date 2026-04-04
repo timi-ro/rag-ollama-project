@@ -8,8 +8,7 @@ venv/
 env/
 ENV/
 
-# Vector Database
-chroma_db/
+# Vector Database (Qdrant data is stored in Docker volume, not locally)
 
 # IDE
 .vscode/
