@@ -1,6 +1,10 @@
 import asyncio
+import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +20,19 @@ from routers.chat import process_chat_job
 from services import job_queue, chat_queue
 
 
+def _ensure_admin_secret() -> str:
+    secret = os.getenv("ADMIN_SECRET", "")
+    if secret in _INSECURE_SECRET_DEFAULTS:
+        secret = secrets.token_hex(32)
+        os.environ["ADMIN_SECRET"] = secret
+        logger.warning(
+            "ADMIN_SECRET not set — generated a temporary secret for this session: %s\n"
+            "Set ADMIN_SECRET in your .env file to make it permanent.",
+            secret,
+        )
+    return secret
+
+
 def get_api_key(request: Request) -> str:
     return request.headers.get("X-API-Key", request.client.host)
 
@@ -27,13 +44,9 @@ _INSECURE_SECRET_DEFAULTS = {"", "change-me-in-production"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    secret = os.getenv("ADMIN_SECRET", "")
-    if secret in _INSECURE_SECRET_DEFAULTS:
-        raise RuntimeError(
-            "ADMIN_SECRET env var is not set or is still the default placeholder. "
-            "Set a strong secret before starting the server."
-        )
+    _ensure_admin_secret()
     init_db()
+    job_queue.recover_jobs()
     asyncio.create_task(job_queue.run_worker(process_upload_job))
     asyncio.create_task(chat_queue.run_worker(process_chat_job))
     yield

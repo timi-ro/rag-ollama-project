@@ -1,7 +1,7 @@
 import os
 import datetime
 from datetime import timezone
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, text
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, Float, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
@@ -37,6 +37,22 @@ class RequestLog(Base):
     endpoint = Column(String)
     status_code = Column(Integer)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(timezone.utc))
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+    job_id       = Column(String, primary_key=True)
+    site_id      = Column(Integer, nullable=False, index=True)
+    site_plan    = Column(String, nullable=False)
+    tmp_path     = Column(String)
+    ext          = Column(String)
+    filename     = Column(String)
+    status       = Column(String, default="queued")
+    created_at   = Column(Float)
+    started_at   = Column(Float, nullable=True)
+    completed_at = Column(Float, nullable=True)
+    result       = Column(String, nullable=True)   # JSON-encoded dict
+    error        = Column(String, nullable=True)
 
 
 def _migrate_db():

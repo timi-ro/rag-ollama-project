@@ -1,13 +1,16 @@
+import logging
 import os
 import uuid
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
     Filter, FieldCondition, MatchValue,
-    FilterSelector,
+    FilterSelector, PayloadSchemaType,
 )
 
 load_dotenv()
@@ -30,6 +33,11 @@ def _get_client() -> QdrantClient:
                 collection_name=COLLECTION_NAME,
                 vectors_config=VectorParams(size=EMBED_DIM, distance=Distance.COSINE),
             )
+            _client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="site_id",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
     return _client
 
 
@@ -51,13 +59,10 @@ def _doc_filter(site_id: int, doc_id: str) -> Filter:
 
 def upsert_chunks(site_id: int, doc_id: str, title: str, chunks: list, embeddings: list):
     client = _get_client()
-    try:
-        client.delete(
-            collection_name=COLLECTION_NAME,
-            points_selector=FilterSelector(filter=_doc_filter(site_id, doc_id)),
-        )
-    except Exception:
-        pass
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=FilterSelector(filter=_doc_filter(site_id, doc_id)),
+    )
     if not chunks:
         return
     points = [
@@ -156,7 +161,7 @@ def delete_doc_chunks(site_id: int, doc_id: str):
             points_selector=FilterSelector(filter=_doc_filter(site_id, doc_id)),
         )
     except Exception:
-        pass
+        logger.warning("Failed to delete chunks for doc %s (site %s)", doc_id, site_id, exc_info=True)
 
 
 def delete_site_chunks(site_id: int):
@@ -167,4 +172,4 @@ def delete_site_chunks(site_id: int):
             points_selector=FilterSelector(filter=_site_filter(site_id)),
         )
     except Exception:
-        pass
+        logger.warning("Failed to delete chunks for site %s", site_id, exc_info=True)
