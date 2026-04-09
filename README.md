@@ -483,7 +483,7 @@ And remove the `ollama` service from `docker-compose.yml`. Ollama running native
 ## 👩🏼‍💻Author
 
 **Fatima R.**
-- Backend Developer | AI Enthusiast
+- AI Software Engineer
 - LinkedIn: [linkedin.com/in/frostami](https://www.linkedin.com/in/frostami/)
 
 ---
